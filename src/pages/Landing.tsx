@@ -799,13 +799,13 @@ export default function Landing() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Artista(s)</Label>
+                      <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Firma</Label>
                       <span className="text-[10px] text-neutral-400 font-mono">{artista.length}/25</span>
                     </div>
                     <Input
                       value={artista}
                       onChange={e => setArtista(e.target.value)}
-                      placeholder="Ej. Juan y María"
+                      placeholder="Ej. Juan y María / Tu Firma"
                       className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all"
                       maxLength={25}
                     />
@@ -1038,8 +1038,8 @@ export default function Landing() {
                 <p className="text-xs font-bold text-neutral-800 truncate">{titulo || 'Sin título'}</p>
               </div>
               <div className="bg-white p-3 rounded-xl border border-neutral-100">
-                <p className="text-[9px] text-neutral-400 uppercase font-bold">Artista</p>
-                <p className="text-xs font-bold text-neutral-800 truncate">{artista || 'Sin artista'}</p>
+                <p className="text-[9px] text-neutral-400 uppercase font-bold">Firma</p>
+                <p className="text-xs font-bold text-neutral-800 truncate">{artista || 'Sin firma'}</p>
               </div>
             </div>
             <Button

@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'CursiveCustom';
+  src: url('/fonts/cursive.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-cursive {
+  font-family: 'CursiveCustom', 'Caveat', 'Dancing Script', 'Segoe Script', cursive, sans-serif;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

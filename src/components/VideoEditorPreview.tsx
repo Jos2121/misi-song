@@ -21,7 +21,7 @@ export interface VideoEditorPreviewProps {
   customBackground?: string;
   userPhotoUrl: string;
   titulo: string;
-  artista: string;
+  artista: string; // Utilizado para la Firma
   dedicatoria: string;
   
   // Explicit coordinate overrides
@@ -79,8 +79,11 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
 }) => {
 
   const renderTextNode = (key: 'titulo' | 'artista' | 'dedicatoria', text: string, placeholder: string) => {
-    const t = config?.[key] || { x: 130, y: 1040, fontSize: 32, color: 'white', align: 'left' };
+    const t = config?.[key] || { x: 130, y: 1040, fontSize: 36, color: 'white', align: 'left', visible: true };
     
+    // Si la visibilidad está desactivada, no se renderiza
+    if (t.visible === false) return null;
+
     // Resolve dynamic positions/sizes
     let activeX: number | string = t.x;
     let activeY: number = t.y;
@@ -100,41 +103,37 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
       if (dedicatoriaSize !== undefined) activeSize = dedicatoriaSize;
     }
 
-    const isCenter = t.align === 'center';
+    const align = t.align || (key === 'dedicatoria' ? 'center' : 'left');
 
-    if (key === 'dedicatoria') {
-      return (
-        <div
-          className="absolute text-center break-words max-w-[75%] leading-relaxed drop-shadow-md"
-          style={{
-            left: activeX === 'center' ? '50%' : `${(Number(activeX) / 1080) * 100}%`,
-            top: `${(activeY / 1920) * 100}%`,
-            transform: activeX === 'center' ? 'translateX(-50%)' : 'none',
-            width: 'max-content',
-            fontSize: `${(activeSize * scale)}px`, 
-            color: t.color,
-          }}
-        >
-          {text || placeholder}
-        </div>
-      );
+    const styleObj: React.CSSProperties = {
+      top: `${(activeY / 1920) * 100}%`,
+      fontSize: `${activeSize * scale}px`,
+      color: t.color,
+      textAlign: align,
+      lineHeight: '1.25',
+    };
+
+    if (align === 'center') {
+      styleObj.left = '50%';
+      styleObj.transform = 'translateX(-50%)';
+      styleObj.width = key === 'dedicatoria' ? 'max-content' : '84%';
+      styleObj.maxWidth = '84%';
+    } else if (align === 'right') {
+      styleObj.right = '8%';
+      styleObj.width = '84%';
+      styleObj.maxWidth = '84%';
+    } else {
+      // left
+      const leftPercent = activeX === 'center' ? '8%' : `${(Number(activeX) / 1080) * 100}%`;
+      styleObj.left = leftPercent;
+      styleObj.width = `calc(92% - ${leftPercent})`;
+      styleObj.maxWidth = '84%';
     }
-
-    const leftPos = isCenter ? '10%' : `${(Number(activeX) / 1080) * 100}%`;
-    const widthVal = isCenter ? '80%' : `calc(90% - ${(Number(activeX) / 1080) * 100}%)`;
 
     return (
       <div
-        className="absolute whitespace-pre-wrap break-words drop-shadow-md"
-        style={{
-          left: leftPos,
-          top: `${(activeY / 1920) * 100}%`,
-          width: widthVal,
-          fontSize: `${activeSize * scale}px`,
-          color: t.color,
-          textAlign: t.align as any,
-          lineHeight: '1.25'
-        }}
+        className="absolute whitespace-pre-wrap break-words drop-shadow-md font-cursive italic tracking-wide select-none"
+        style={styleObj}
       >
         {text || placeholder}
       </div>
@@ -145,6 +144,7 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
   const finalPhotoY = photoY !== undefined ? photoY : (config?.photo?.y ?? 180);
   const finalPhotoW = photoWidth !== undefined ? photoWidth : (config?.photo?.w ?? 820);
   const finalPhotoH = photoHeight !== undefined ? photoHeight : (config?.photo?.h ?? 820);
+  const hasPolaroidFrame = config?.photo?.frame !== false;
 
   // Background resolution
   const resolvedBg = (() => {
@@ -247,9 +247,9 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
         <div className="absolute inset-0 w-full h-full bg-gray-900" />
       )}
 
-      {/* Cover Photo */}
+      {/* Cover Photo: Polaroid Frame or Standard */}
       <div
-        className="absolute overflow-hidden"
+        className="absolute"
         style={{
           left: `${(finalPhotoX / 1080) * 100}%`,
           top: `${(finalPhotoY / 1920) * 100}%`,
@@ -257,19 +257,38 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
           height: `${(finalPhotoH / 1920) * 100}%`,
         }}
       >
-        {userPhotoUrl ? (
-          <img src={userPhotoUrl.trim()} alt="Cover" className="w-full h-full object-cover rounded-md shadow-2xl" />
+        {hasPolaroidFrame ? (
+          /* Marco de fotografía blanco estilo Polaroid con espacio extendido inferior */
+          <div className="w-full h-full bg-white rounded-[2px] shadow-[0_12px_28px_rgba(0,0,0,0.45)] border border-neutral-100 p-[4%] pb-[17%] flex flex-col justify-start">
+            <div className="w-full flex-1 aspect-square overflow-hidden bg-neutral-900 rounded-[1px] relative shadow-inner">
+              {userPhotoUrl ? (
+                <img src={userPhotoUrl.trim()} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-neutral-800/90 flex flex-col items-center justify-center text-neutral-400">
+                  <ImageIcon className="w-8 h-8 md:w-12 md:h-12 mb-2 opacity-60" />
+                  <span className="text-[10px] md:text-xs font-medium text-center">Foto</span>
+                </div>
+              )}
+            </div>
+          </div>
         ) : (
-          <div className="w-full h-full bg-gray-800/80 backdrop-blur flex flex-col items-center justify-center text-gray-400 rounded-md border-2 border-dashed border-gray-600">
-            <ImageIcon className="w-8 h-8 md:w-12 md:h-12 mb-2" />
-            <span className="text-[10px] md:text-xs font-medium text-center">Cover Photo</span>
+          /* Sin marco */
+          <div className="w-full h-full overflow-hidden rounded-md shadow-2xl">
+            {userPhotoUrl ? (
+              <img src={userPhotoUrl.trim()} alt="Cover" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gray-800/80 backdrop-blur flex flex-col items-center justify-center text-gray-400 rounded-md border-2 border-dashed border-gray-600">
+                <ImageIcon className="w-8 h-8 md:w-12 md:h-12 mb-2" />
+                <span className="text-[10px] md:text-xs font-medium text-center">Cover Photo</span>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Texts */}
+      {/* Texts in Cursive */}
       {renderTextNode('titulo', titulo, 'Título de Canción')}
-      {renderTextNode('artista', artista, 'Nombre del Artista')}
+      {renderTextNode('artista', artista, 'Firma')}
       {renderTextNode('dedicatoria', dedicatoria, 'Mensaje de dedicatoria...')}
 
       {/* Visualización Musical */}

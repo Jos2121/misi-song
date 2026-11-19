@@ -61,15 +61,24 @@ interface MediaJob {
   voucherUrl?: string | null;
 }
 
+export interface TemplateTextNode {
+  x: number | string;
+  y: number;
+  fontSize: number;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  visible?: boolean;
+}
+
 export interface TemplateConfig {
   id: string;
   name: string;
   bgUrl: string;
   type?: 'completa' | 'coordenadas';
-  photo: { x: number; y: number; w: number; h: number };
-  titulo: { x: number; y: number; fontSize: number; color: string; align: 'left' | 'center' };
-  artista: { x: number; y: number; fontSize: number; color: string; align: 'left' | 'center' };
-  dedicatoria: { x: number; y: number; fontSize: number; color: string; align: 'left' | 'center' };
+  photo: { x: number; y: number; w: number; h: number; frame?: boolean };
+  titulo: TemplateTextNode;
+  artista: TemplateTextNode; // Usado para Firma
+  dedicatoria: TemplateTextNode;
   visualizer?: {
     enabled?: boolean;
     x?: number | string;
@@ -84,10 +93,10 @@ export const DEFAULT_TEMPLATE: TemplateConfig = {
   id: '',
   name: 'Plantilla por Defecto',
   bgUrl: '',
-  photo: { x: 130, y: 180, w: 820, h: 820 },
-  titulo: { x: 130, y: 1040, fontSize: 42, color: 'white', align: 'left' },
-  artista: { x: 130, y: 1095, fontSize: 30, color: '#B3B3B3', align: 'left' },
-  dedicatoria: { x: 540, y: 1620, fontSize: 28, color: '#E5E5E5', align: 'center' },
+  photo: { x: 130, y: 180, w: 820, h: 820, frame: true },
+  titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true },
+  artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true },
+  dedicatoria: { x: 540, y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true },
   visualizer: { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' },
 };
 
@@ -222,7 +231,7 @@ export default function Dashboard() {
     setTemplateCustomBg('');
     setTemplateUserPhotoUrl('https://placehold.co/400x400/eeeeee/999999?text=Portada');
     setTemplateTitulo('Título Muestra');
-    setTemplateArtista('Artista Muestra');
+    setTemplateArtista('Firma Muestra');
     setTemplateDedicatoria('Dedicatoria de muestra...');
     setTemplateDedicatoriaSize(28);
     setTemplateConfig({ ...DEFAULT_TEMPLATE, id: '' });
@@ -271,10 +280,38 @@ export default function Dashboard() {
         dedicatoriaSize: Number(dedicatoriaSz),
         visualizer: config.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' },
         ...(mode === 'completa' ? { backgroundUrl: bgUrl, bgUrl: bgUrl } : {}),
-        photo: { ...config.photo, x: Number(config.photo.x), y: Number(config.photo.y), w: Number(config.photo.w), h: Number(config.photo.h) },
-        titulo: { ...config.titulo, x: Number(config.titulo.x), y: Number(config.titulo.y), fontSize: Number(config.titulo.fontSize) },
-        artista: { ...config.artista, x: Number(config.artista.x), y: Number(config.artista.y), fontSize: Number(config.artista.fontSize) },
-        dedicatoria: { ...config.dedicatoria, x: Number(config.dedicatoria.x), y: Number(config.dedicatoria.y), fontSize: Number(dedicatoriaSz) }
+        photo: {
+          ...config.photo,
+          x: Number(config.photo.x),
+          y: Number(config.photo.y),
+          w: Number(config.photo.w),
+          h: Number(config.photo.h),
+          frame: config.photo.frame !== false
+        },
+        titulo: {
+          ...config.titulo,
+          x: Number(config.titulo.x),
+          y: Number(config.titulo.y),
+          fontSize: Number(config.titulo.fontSize),
+          align: config.titulo.align || 'left',
+          visible: config.titulo.visible !== false
+        },
+        artista: {
+          ...config.artista,
+          x: Number(config.artista.x),
+          y: Number(config.artista.y),
+          fontSize: Number(config.artista.fontSize),
+          align: config.artista.align || 'left',
+          visible: config.artista.visible !== false
+        },
+        dedicatoria: {
+          ...config.dedicatoria,
+          x: Number(config.dedicatoria.x),
+          y: Number(config.dedicatoria.y),
+          fontSize: Number(dedicatoriaSz),
+          align: config.dedicatoria.align || 'center',
+          visible: config.dedicatoria.visible !== false
+        }
       };
 
       const res = await fetch('/api/templates/save', {
@@ -655,7 +692,7 @@ export default function Dashboard() {
     
     const finalBg = backgroundUrl === 'custom' ? customBackground : backgroundUrl;
     if (!whatsappNumber || !userPhotoUrl || !titulo || !artista) {
-      toast.error('Por favor, completa todos los campos requeridos (Número, Portada, Título, Artista).');
+      toast.error('Por favor, completa todos los campos requeridos (Número, Portada, Título, Firma).');
       return;
     }
 
@@ -932,83 +969,200 @@ export default function Dashboard() {
     );
   };
 
-  const renderConfigControls = (config: TemplateConfig, setConfig: any, key: 'titulo'|'artista'|'dedicatoria', extSizeState?: number, setExtSizeState?: any) => (
-    <div className="flex gap-2 mt-2">
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-neutral-400 uppercase font-bold">X:</span>
-        <input
-          type="number"
-          value={config[key].align === 'center' ? '' : config[key].x}
-          onChange={(e) => setConfig({...config, [key]: {...config[key], x: Number(e.target.value), align: 'left'}})}
-          className="w-16 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
-          placeholder="Ctr"
-        />
-      </div>
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-neutral-400 uppercase font-bold">Y:</span>
-        <input
-          type="number"
-          value={config[key].y}
-          onChange={(e) => setConfig({...config, [key]: {...config[key], y: Number(e.target.value)}})}
-          className="w-16 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
-        />
-      </div>
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-neutral-400 uppercase font-bold">Size:</span>
-        <input
-          type="number"
-          value={extSizeState !== undefined ? extSizeState : config[key].fontSize}
-          onChange={(e) => {
-            const val = Number(e.target.value);
-            setConfig({...config, [key]: {...config[key], fontSize: val}});
-            if (setExtSizeState) setExtSizeState(val);
-          }}
-          className="w-16 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
-        />
-      </div>
-    </div>
-  );
+  const renderConfigControls = (
+    config: TemplateConfig,
+    setConfig: any,
+    key: 'titulo'|'artista'|'dedicatoria',
+    extSizeState?: number,
+    setExtSizeState?: any
+  ) => {
+    const node = config[key] || { x: 130, y: 1040, fontSize: 32, color: 'white', align: 'left', visible: true };
+    const isVisible = node.visible !== false;
+    const align = node.align || (key === 'dedicatoria' ? 'center' : 'left');
 
-  const renderPhotoControls = (config: TemplateConfig, setConfig: any) => (
-    <div className="flex gap-2 mt-2">
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-neutral-400 uppercase font-bold">X:</span>
-        <input
-          type="number"
-          value={config.photo.x}
-          onChange={(e) => setConfig({...config, photo: {...config.photo, x: Number(e.target.value)}})}
-          className="w-14 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
-        />
+    return (
+      <div className="space-y-2 mt-2 p-2.5 bg-white/70 border border-neutral-200/80 rounded-xl">
+        <div className="flex items-center justify-between gap-2">
+          {/* Aparecer o no aparecer */}
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-neutral-700">
+            <input
+              type="checkbox"
+              checked={isVisible}
+              onChange={(e) => setConfig({
+                ...config,
+                [key]: { ...node, visible: e.target.checked }
+              })}
+              className="rounded accent-[#8B1F32]"
+            />
+            <span>{isVisible ? 'Visible' : 'Oculto'}</span>
+          </label>
+
+          {/* Centrarse o hacer a un costado */}
+          <div className="flex items-center bg-neutral-100 p-0.5 rounded-lg border border-neutral-200">
+            <button
+              type="button"
+              onClick={() => setConfig({
+                ...config,
+                [key]: { ...node, align: 'left', x: node.x === 'center' ? 130 : node.x }
+              })}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                align === 'left' ? 'bg-[#8B1F32] text-white shadow-xs' : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+              title="Alinear a la izquierda"
+            >
+              Izq
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfig({
+                ...config,
+                [key]: { ...node, align: 'center' }
+              })}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                align === 'center' ? 'bg-[#8B1F32] text-white shadow-xs' : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+              title="Centrar texto"
+            >
+              Centro
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfig({
+                ...config,
+                [key]: { ...node, align: 'right' }
+              })}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                align === 'right' ? 'bg-[#8B1F32] text-white shadow-xs' : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+              title="Alinear a la derecha"
+            >
+              Der
+            </button>
+          </div>
+        </div>
+
+        {isVisible && (
+          <div className="flex flex-wrap gap-2 items-center pt-1 border-t border-neutral-100">
+            {align !== 'center' && (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-neutral-400 uppercase font-bold">X:</span>
+                <input
+                  type="number"
+                  value={node.x === 'center' ? 130 : node.x}
+                  onChange={(e) => setConfig({
+                    ...config,
+                    [key]: { ...node, x: Number(e.target.value) }
+                  })}
+                  className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Y:</span>
+              <input
+                type="number"
+                value={node.y}
+                onChange={(e) => setConfig({
+                  ...config,
+                  [key]: { ...node, y: Number(e.target.value) }
+                })}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Size:</span>
+              <input
+                type="number"
+                value={extSizeState !== undefined ? extSizeState : node.fontSize}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setConfig({ ...config, [key]: { ...node, fontSize: val } });
+                  if (setExtSizeState) setExtSizeState(val);
+                }}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Color:</span>
+              <input
+                type="color"
+                value={node.color || '#FFFFFF'}
+                onChange={(e) => setConfig({
+                  ...config,
+                  [key]: { ...node, color: e.target.value }
+                })}
+                className="w-6 h-6 rounded cursor-pointer border p-0"
+              />
+            </div>
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-neutral-400 uppercase font-bold">Y:</span>
-        <input
-          type="number"
-          value={config.photo.y}
-          onChange={(e) => setConfig({...config, photo: {...config.photo, y: Number(e.target.value)}})}
-          className="w-14 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
-        />
+    );
+  };
+
+  const renderPhotoControls = (config: TemplateConfig, setConfig: any) => {
+    const hasFrame = config.photo.frame !== false;
+
+    return (
+      <div className="space-y-2 mt-2 p-2.5 bg-white/70 border border-neutral-200/80 rounded-xl">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase text-neutral-600 tracking-wider">
+            Posición de Portada
+          </span>
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-neutral-700">
+            <input
+              type="checkbox"
+              checked={hasFrame}
+              onChange={(e) => setConfig({
+                ...config,
+                photo: { ...config.photo, frame: e.target.checked }
+              })}
+              className="rounded accent-[#8B1F32]"
+            />
+            <span>Marco Polaroid</span>
+          </label>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-neutral-400 uppercase font-bold">X:</span>
+            <input
+              type="number"
+              value={config.photo.x}
+              onChange={(e) => setConfig({...config, photo: {...config.photo, x: Number(e.target.value)}})}
+              className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-neutral-400 uppercase font-bold">Y:</span>
+            <input
+              type="number"
+              value={config.photo.y}
+              onChange={(e) => setConfig({...config, photo: {...config.photo, y: Number(e.target.value)}})}
+              className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-neutral-400 uppercase font-bold">W:</span>
+            <input
+              type="number"
+              value={config.photo.w}
+              onChange={(e) => setConfig({...config, photo: {...config.photo, w: Number(e.target.value)}})}
+              className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-neutral-400 uppercase font-bold">H:</span>
+            <input
+              type="number"
+              value={config.photo.h}
+              onChange={(e) => setConfig({...config, photo: {...config.photo, h: Number(e.target.value)}})}
+              className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+            />
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-neutral-400 uppercase font-bold">W:</span>
-        <input
-          type="number"
-          value={config.photo.w}
-          onChange={(e) => setConfig({...config, photo: {...config.photo, w: Number(e.target.value)}})}
-          className="w-14 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
-        />
-      </div>
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-neutral-400 uppercase font-bold">H:</span>
-        <input
-          type="number"
-          value={config.photo.h}
-          onChange={(e) => setConfig({...config, photo: {...config.photo, h: Number(e.target.value)}})}
-          className="w-14 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
-        />
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderVisualizerControls = (config: TemplateConfig, setConfig: any) => {
     const vis = config.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' };
@@ -1778,12 +1932,12 @@ export default function Dashboard() {
                       {renderConfigControls(studioTemplateConfig, setStudioTemplateConfig, 'titulo')}
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Artista</Label>
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Firma</Label>
                       <Input
                         value={artista}
                         onChange={(e) => setArtista(e.target.value)}
                         disabled={isProcessing}
-                        placeholder="Nombre..."
+                        placeholder="Firma..."
                         className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] text-xs h-10"
                       />
                       {renderConfigControls(studioTemplateConfig, setStudioTemplateConfig, 'artista')}
@@ -1979,11 +2133,11 @@ export default function Dashboard() {
                       {renderConfigControls(regenerateTemplateConfig, setRegenerateTemplateConfig, 'titulo')}
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Artista</Label>
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Firma</Label>
                       <Input
                         value={regenerateArtista}
                         onChange={(e) => setRegenerateArtista(e.target.value)}
-                        placeholder="Artista..."
+                        placeholder="Firma..."
                         className="rounded-xl border-neutral-200 text-xs h-10 mb-2"
                       />
                       {renderConfigControls(regenerateTemplateConfig, setRegenerateTemplateConfig, 'artista')}
@@ -2133,7 +2287,7 @@ export default function Dashboard() {
                       {renderConfigControls(templateConfig, setTemplateConfig, 'titulo')}
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Artista</Label>
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Firma</Label>
                       {renderConfigControls(templateConfig, setTemplateConfig, 'artista')}
                     </div>
                   </div>

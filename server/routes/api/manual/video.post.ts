@@ -165,6 +165,7 @@ export default defineHandler(async (event) => {
       const photoH = Number(t.photo?.h) || 820;
       const photoX = Number(t.photo?.x) || 130;
       const photoY = Number(t.photo?.y) || 180;
+      const hasPolaroidFrame = t.photo?.frame !== false;
 
       const bgInput = tempBgPath
         ? (isVideoBg ? `-stream_loop -1 -i "${tempBgPath}"` : `-loop 1 -framerate 1 -i "${tempBgPath}"`)
@@ -172,9 +173,24 @@ export default defineHandler(async (event) => {
 
       // Escala del fondo sin deformarlo (crop centrado al formato vertical 1080x1920) y normaliza a 25fps
       let filter = `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg_base];`;
-      // Recorte dinámico basado en las dimensiones de la foto
-      filter += `[0:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2[photo];`;
-      // Overlay
+
+      if (hasPolaroidFrame) {
+        // Marco Polaroid blanco con espacio extendido en la parte inferior
+        const padX = Math.round(photoW * 0.045);
+        const padTop = Math.round(photoH * 0.045);
+        const padBottom = Math.round(photoH * 0.17);
+        const innerW = photoW - (padX * 2);
+        const innerH = photoH - padTop - padBottom;
+
+        filter += `color=c=white:s=${photoW}x${photoH}:d=1,fps=25[polaroid_card];`;
+        filter += `[0:v]scale=w=${innerW}:h=${innerH}:force_original_aspect_ratio=increase,crop=${innerW}:${innerH}:(in_w-${innerW})/2:(in_h-${innerH})/2,fps=25[inner_photo];`;
+        filter += `[polaroid_card][inner_photo]overlay=x=${padX}:y=${padTop}[photo];`;
+      } else {
+        // Recorte dinámico basado en las dimensiones de la foto
+        filter += `[0:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2[photo];`;
+      }
+
+      // Overlay foto en fondo
       filter += `[bg_base][photo]overlay=x=${photoX}:y=${photoY}[v1]`;
 
       let lastV = 'v1';
@@ -196,23 +212,31 @@ export default defineHandler(async (event) => {
         vIndex++;
       }
       
-      if (safeTitulo) {
-        const xPos = t.titulo.align === 'center' ? '(w-text_w)/2' : t.titulo.x;
-        filter += `;[${lastV}]drawtext=text='${safeTitulo}':fontcolor=${t.titulo.color}:fontsize=${t.titulo.fontSize}:x=${xPos}:y=${t.titulo.y}[v${vIndex}]`;
+      const fontFileOnDisk = path.resolve(process.cwd(), "public/fonts/cursive.ttf");
+      const fontParam = fs.existsSync(fontFileOnDisk)
+        ? `:fontfile='${fontFileOnDisk.replace(/\\/g, "/").replace(/:/g, "\\:")}'`
+        : `:font='Segoe Script'`;
+
+      if (t.titulo?.visible !== false && safeTitulo) {
+        const align = t.titulo.align || 'left';
+        const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-130' : (t.titulo.x || 130));
+        filter += `;[${lastV}]drawtext=text='${safeTitulo}'${fontParam}:fontcolor=${t.titulo.color}:fontsize=${t.titulo.fontSize}:x=${xPos}:y=${t.titulo.y}[v${vIndex}]`;
         lastV = `v${vIndex}`;
         vIndex++;
       }
       
-      if (safeArtista) {
-        const xPos = t.artista.align === 'center' ? '(w-text_w)/2' : t.artista.x;
-        filter += `;[${lastV}]drawtext=text='${safeArtista}':fontcolor=${t.artista.color}:fontsize=${t.artista.fontSize}:x=${xPos}:y=${t.artista.y}[v${vIndex}]`;
+      if (t.artista?.visible !== false && safeArtista) {
+        const align = t.artista.align || 'left';
+        const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-130' : (t.artista.x || 130));
+        filter += `;[${lastV}]drawtext=text='${safeArtista}'${fontParam}:fontcolor=${t.artista.color}:fontsize=${t.artista.fontSize}:x=${xPos}:y=${t.artista.y}[v${vIndex}]`;
         lastV = `v${vIndex}`;
         vIndex++;
       }
       
-      if (escapedDedicatoria) {
-        // Uso de variables dinámicas directas, tamaño, centrado perfecto y espaciado proporcional
-        filter += `;[${lastV}]drawtext=text='${escapedDedicatoria}':fontcolor=${dedicatoriaColor}:fontsize=${dedicatoriaSize}:x=(w-text_w)/2:y=${dedicatoriaY}:line_spacing=${Math.round(dedicatoriaSize * 0.4)}[v${vIndex}]`;
+      if (t.dedicatoria?.visible !== false && escapedDedicatoria) {
+        const align = t.dedicatoria.align || 'center';
+        const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-130' : (t.dedicatoria.x || 130));
+        filter += `;[${lastV}]drawtext=text='${escapedDedicatoria}'${fontParam}:fontcolor=${dedicatoriaColor}:fontsize=${dedicatoriaSize}:x=${xPos}:y=${dedicatoriaY}:line_spacing=${Math.round(dedicatoriaSize * 0.4)}[v${vIndex}]`;
         lastV = `v${vIndex}`;
         vIndex++;
       }
