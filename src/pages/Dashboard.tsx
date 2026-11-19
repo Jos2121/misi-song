@@ -23,11 +23,13 @@ import {
   Headphones,
   Upload,
   Download,
-  X
+  X,
+  Activity,
+  Loader2
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { VideoEditorPreview } from '../components/VideoEditorPreview';
+import { VideoEditorPreview, isVideoUrl } from '../components/VideoEditorPreview';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -68,6 +70,14 @@ export interface TemplateConfig {
   titulo: { x: number; y: number; fontSize: number; color: string; align: 'left' | 'center' };
   artista: { x: number; y: number; fontSize: number; color: string; align: 'left' | 'center' };
   dedicatoria: { x: number; y: number; fontSize: number; color: string; align: 'left' | 'center' };
+  visualizer?: {
+    enabled?: boolean;
+    x?: number | string;
+    y?: number;
+    w?: number;
+    h?: number;
+    color?: string;
+  };
 }
 
 export const DEFAULT_TEMPLATE: TemplateConfig = {
@@ -78,6 +88,7 @@ export const DEFAULT_TEMPLATE: TemplateConfig = {
   titulo: { x: 130, y: 1040, fontSize: 42, color: 'white', align: 'left' },
   artista: { x: 130, y: 1095, fontSize: 30, color: '#B3B3B3', align: 'left' },
   dedicatoria: { x: 540, y: 1620, fontSize: 28, color: '#E5E5E5', align: 'center' },
+  visualizer: { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' },
 };
 
 const statusColors: Record<JobStatus, string> = {
@@ -258,6 +269,7 @@ export default function Dashboard() {
         dedicatoriaX: Number(config.dedicatoria.x),
         dedicatoriaY: Number(config.dedicatoria.y),
         dedicatoriaSize: Number(dedicatoriaSz),
+        visualizer: config.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' },
         ...(mode === 'completa' ? { backgroundUrl: bgUrl, bgUrl: bgUrl } : {}),
         photo: { ...config.photo, x: Number(config.photo.x), y: Number(config.photo.y), w: Number(config.photo.w), h: Number(config.photo.h) },
         titulo: { ...config.titulo, x: Number(config.titulo.x), y: Number(config.titulo.y), fontSize: Number(config.titulo.fontSize) },
@@ -443,6 +455,40 @@ export default function Dashboard() {
       toast.error(err.message || 'Error al subir la imagen');
     } finally {
       setIsUploadingPhoto(false);
+    }
+  };
+
+  const [isUploadingTemplateBg, setIsUploadingTemplateBg] = useState(false);
+  const [isUploadingStudioBg, setIsUploadingStudioBg] = useState(false);
+  const [isUploadingRegenerateBg, setIsUploadingRegenerateBg] = useState(false);
+
+  const handleUploadBgFile = async (
+    file: File,
+    onSuccess: (url: string) => void,
+    setLoading: (l: boolean) => void
+  ) => {
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("El archivo no puede pesar más de 100MB");
+      return;
+    }
+    setLoading(true);
+    const isVideo = file.type.includes('video') || file.name.toLowerCase().endsWith('.mp4');
+    const toastId = toast.loading(isVideo ? 'Subiendo video wallpaper MP4...' : 'Subiendo fondo...');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/public/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.statusMessage || 'Error al subir archivo');
+      onSuccess(data.url);
+      toast.success(isVideo ? 'Video wallpaper MP4 subido correctamente' : 'Fondo subido correctamente', { id: toastId });
+    } catch (err: any) {
+      toast.error(err.message || 'Error al subir fondo', { id: toastId });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -789,6 +835,12 @@ export default function Dashboard() {
       else if (configData.dedicatorySize !== undefined) dedicatoriaSz = Number(configData.dedicatorySize);
       
       nextConfig.dedicatoria.fontSize = dedicatoriaSz;
+
+      if (configData.visualizer !== undefined) {
+        nextConfig.visualizer = configData.visualizer;
+      } else {
+        nextConfig.visualizer = { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' };
+      }
       
       if (setDedicatoriaSizeState) {
         setDedicatoriaSizeState(dedicatoriaSz);
@@ -957,6 +1009,92 @@ export default function Dashboard() {
       </div>
     </div>
   );
+
+  const renderVisualizerControls = (config: TemplateConfig, setConfig: any) => {
+    const vis = config.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' };
+    const enabled = vis.enabled !== false;
+
+    return (
+      <div className="p-3 bg-white/70 border border-neutral-200/80 rounded-2xl space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Activity className="w-4 h-4 text-[#8B1F32]" />
+            <span className="text-[10px] font-bold uppercase text-neutral-700 tracking-wider">
+              Visualización Musical (Onda Sonora)
+            </span>
+          </div>
+          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-neutral-700">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setConfig({
+                ...config,
+                visualizer: {
+                  ...vis,
+                  enabled: e.target.checked
+                }
+              })}
+              className="rounded accent-[#8B1F32]"
+            />
+            <span>{enabled ? 'Visible' : 'Oculto'}</span>
+          </label>
+        </div>
+
+        {enabled && (
+          <div className="flex flex-wrap gap-2 items-center pt-1 border-t border-neutral-100">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Y:</span>
+              <input
+                type="number"
+                value={vis.y ?? 1180}
+                onChange={(e) => setConfig({
+                  ...config,
+                  visualizer: { ...vis, y: Number(e.target.value) }
+                })}
+                className="w-16 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Alt:</span>
+              <input
+                type="number"
+                value={vis.h ?? 70}
+                onChange={(e) => setConfig({
+                  ...config,
+                  visualizer: { ...vis, h: Number(e.target.value) }
+                })}
+                className="w-14 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Ancho:</span>
+              <input
+                type="number"
+                value={vis.w ?? 820}
+                onChange={(e) => setConfig({
+                  ...config,
+                  visualizer: { ...vis, w: Number(e.target.value) }
+                })}
+                className="w-16 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Color:</span>
+              <input
+                type="color"
+                value={vis.color || '#FFFFFF'}
+                onChange={(e) => setConfig({
+                  ...config,
+                  visualizer: { ...vis, color: e.target.value }
+                })}
+                className="w-6 h-6 rounded cursor-pointer border p-0"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const handleUpdatePrompt = async (jobId: string) => {
     if (!editingPromptValue.trim()) return toast.error("El prompt no puede estar vacío");
@@ -1536,18 +1674,62 @@ export default function Dashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">URL Fondo Reproductor</Label>
-                    <Input
-                      type="url"
-                      value={backgroundUrl === 'custom' ? customBackground : backgroundUrl}
-                      onChange={(e) => {
-                        setBackgroundUrl('custom');
-                        setCustomBackground(e.target.value);
-                      }}
-                      disabled={isProcessing}
-                      placeholder="https://..."
-                      className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] text-xs h-10"
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Fondo / Live Wallpaper (MP4 o Imagen)</Label>
+                      {(backgroundUrl === 'custom' ? customBackground : backgroundUrl) && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          {isVideoUrl(backgroundUrl === 'custom' ? customBackground : backgroundUrl) ? '🎥 Video MP4' : '🖼️ Imagen'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="url"
+                        value={backgroundUrl === 'custom' ? customBackground : backgroundUrl}
+                        onChange={(e) => {
+                          setBackgroundUrl('custom');
+                          setCustomBackground(e.target.value);
+                        }}
+                        disabled={isProcessing}
+                        placeholder="https://... o sube video MP4 / imagen"
+                        className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] text-xs h-10 flex-1"
+                      />
+                      <div className="relative flex items-center justify-center">
+                        <Input
+                          type="file"
+                          accept="image/*,video/mp4,video/*"
+                          disabled={isProcessing || isUploadingStudioBg}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              await handleUploadBgFile(
+                                file,
+                                (url) => {
+                                  setBackgroundUrl('custom');
+                                  setCustomBackground(url);
+                                },
+                                setIsUploadingStudioBg
+                              );
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isProcessing || isUploadingStudioBg}
+                          className="h-10 px-3 rounded-xl border-dashed border-neutral-300 hover:border-[#8B1F32] hover:text-[#8B1F32] text-xs font-semibold flex items-center gap-1.5 shrink-0"
+                        >
+                          {isUploadingStudioBg ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-[#8B1F32]" />
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
+                          <span>{isUploadingStudioBg ? 'Subiendo...' : 'Subir Fondo'}</span>
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -1621,6 +1803,8 @@ export default function Dashboard() {
                     {renderConfigControls(studioTemplateConfig, setStudioTemplateConfig, 'dedicatoria', dedicatoriaSize, setDedicatoriaSize)}
                   </div>
 
+                  {renderVisualizerControls(studioTemplateConfig, setStudioTemplateConfig)}
+
                   <Button
                     onClick={handleSubmit}
                     disabled={isProcessing}
@@ -1658,6 +1842,7 @@ export default function Dashboard() {
                     artista={artista}
                     dedicatoria={dedicatoria}
                     dedicatoriaSize={dedicatoriaSize}
+                    visualizer={studioTemplateConfig.visualizer}
                     scale={0.296}
                   />
                   <div className="absolute inset-0 pointer-events-none border-[12px] border-white/5 rounded-[32px]" />
@@ -1696,15 +1881,59 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Fondo (URL)</Label>
-                      <Input
-                        value={regenerateBgUrl === 'custom' ? regenerateCustomBg : regenerateBgUrl}
-                        onChange={(e) => { setRegenerateBgUrl('custom'); setRegenerateCustomBg(e.target.value); }}
-                        placeholder="https://..."
-                        className="rounded-xl border-neutral-200 text-xs h-10"
-                      />
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Fondo / Live Wallpaper</Label>
+                        {(regenerateBgUrl === 'custom' ? regenerateCustomBg : regenerateBgUrl) && (
+                          <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            {isVideoUrl(regenerateBgUrl === 'custom' ? regenerateCustomBg : regenerateBgUrl) ? '🎥 MP4' : '🖼️ Foto'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={regenerateBgUrl === 'custom' ? regenerateCustomBg : regenerateBgUrl}
+                          onChange={(e) => { setRegenerateBgUrl('custom'); setRegenerateCustomBg(e.target.value); }}
+                          placeholder="https://... o archivo"
+                          className="rounded-xl border-neutral-200 text-xs h-10 flex-1"
+                        />
+                        <div className="relative flex items-center justify-center">
+                          <Input
+                            type="file"
+                            accept="image/*,video/mp4,video/*"
+                            disabled={isUploadingRegenerateBg}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                await handleUploadBgFile(
+                                  file,
+                                  (url) => {
+                                    setRegenerateBgUrl('custom');
+                                    setRegenerateCustomBg(url);
+                                  },
+                                  setIsUploadingRegenerateBg
+                                );
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isUploadingRegenerateBg}
+                            className="h-10 px-2.5 rounded-xl border-dashed border-neutral-300 hover:border-[#8B1F32] hover:text-[#8B1F32] text-xs font-semibold flex items-center gap-1 shrink-0"
+                          >
+                            {isUploadingRegenerateBg ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8B1F32]" />
+                            ) : (
+                              <Upload className="w-3.5 h-3.5" />
+                            )}
+                            <span className="text-[11px]">{isUploadingRegenerateBg ? '...' : 'Subir'}</span>
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Portada (URL o Archivo)</Label>
@@ -1772,6 +2001,8 @@ export default function Dashboard() {
                     />
                     {renderConfigControls(regenerateTemplateConfig, setRegenerateTemplateConfig, 'dedicatoria', regenerateDedicatoriaSize, setRegenerateDedicatoriaSize)}
                   </div>
+
+                  {renderVisualizerControls(regenerateTemplateConfig, setRegenerateTemplateConfig)}
                 </div>
 
                 <DialogFooter className="pt-6 border-t border-neutral-100 sm:justify-between">
@@ -1800,6 +2031,7 @@ export default function Dashboard() {
                     artista={regenerateArtista}
                     dedicatoria={regenerateDedicatoria}
                     dedicatoriaSize={regenerateDedicatoriaSize}
+                    visualizer={regenerateTemplateConfig.visualizer}
                     scale={0.185}
                   />
                 </div>
@@ -1835,16 +2067,63 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Fondo (URL)</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">
+                        Fondo / Live Wallpaper (MP4 o Imagen)
+                      </Label>
+                      {(templateBgUrl === 'custom' ? templateCustomBg : templateBgUrl) && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          {isVideoUrl(templateBgUrl === 'custom' ? templateCustomBg : templateBgUrl) ? '🎥 Video MP4 (Live Wallpaper)' : '🖼️ Imagen'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
                       <Input
                         value={templateBgUrl === 'custom' ? templateCustomBg : templateBgUrl}
                         onChange={(e) => { setTemplateBgUrl('custom'); setTemplateCustomBg(e.target.value); }}
-                        placeholder="https://..."
-                        className="rounded-xl border-neutral-200 text-xs h-10"
+                        placeholder="https://... o sube video MP4 / imagen"
+                        className="rounded-xl border-neutral-200 text-xs h-10 flex-1"
                       />
+                      <div className="relative flex items-center justify-center">
+                        <Input
+                          type="file"
+                          accept="image/*,video/mp4,video/*"
+                          disabled={isUploadingTemplateBg}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              await handleUploadBgFile(
+                                file,
+                                (url) => {
+                                  setTemplateBgUrl('custom');
+                                  setTemplateCustomBg(url);
+                                },
+                                setIsUploadingTemplateBg
+                              );
+                              e.target.value = '';
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={isUploadingTemplateBg}
+                          className="h-10 px-3 rounded-xl border-dashed border-neutral-300 hover:border-[#8B1F32] hover:text-[#8B1F32] text-xs font-semibold flex items-center gap-1.5 shrink-0"
+                        >
+                          {isUploadingTemplateBg ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-[#8B1F32]" />
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
+                          <span>{isUploadingTemplateBg ? 'Subiendo...' : 'Subir MP4 / Foto'}</span>
+                        </Button>
+                      </div>
                     </div>
+                    <p className="text-[11px] text-neutral-500 leading-tight">
+                      Puedes subir un video <strong>.mp4 (live wallpaper)</strong> de ~5 seg. Al renderizar, se repetirá en bucle para cubrir toda la duración de la canción.
+                    </p>
                   </div>
                   {renderPhotoControls(templateConfig, setTemplateConfig)}
 
@@ -1863,6 +2142,8 @@ export default function Dashboard() {
                     <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Dedicatoria</Label>
                     {renderConfigControls(templateConfig, setTemplateConfig, 'dedicatoria', templateDedicatoriaSize, setTemplateDedicatoriaSize)}
                   </div>
+
+                  {renderVisualizerControls(templateConfig, setTemplateConfig)}
                 </div>
 
                 <DialogFooter className="pt-6 border-t border-neutral-100 sm:justify-between">
@@ -1893,6 +2174,7 @@ export default function Dashboard() {
                     artista={templateArtista}
                     dedicatoria={templateDedicatoria}
                     dedicatoriaSize={templateDedicatoriaSize}
+                    visualizer={templateConfig.visualizer}
                     scale={0.185}
                   />
                 </div>

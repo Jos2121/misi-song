@@ -79,18 +79,40 @@ export default defineHandler(async (event) => {
     }
 
     // Handle background (download if URL, otherwise check local file)
-    if (finalBgStr.startsWith('http')) {
-      const bgRes = await fetchWithTimeout(finalBgStr, {}, 20000);
-      if (bgRes.ok) {
-        tempBgPath = path.join(mediaDir, `temp_bg_${Date.now()}.jpg`);
-        fs.writeFileSync(tempBgPath, Buffer.from(await bgRes.arrayBuffer()));
-      }
-    } else {
-      const localBgPath = path.join(mediaDir, finalBgStr);
-      if (fs.existsSync(localBgPath)) {
-        tempBgPath = localBgPath;
+    const cleanBgName = path.basename(finalBgStr);
+    let resolvedBgPath = path.join(mediaDir, cleanBgName);
+    if (!fs.existsSync(resolvedBgPath)) {
+      const altPath = path.resolve(process.cwd(), "public", finalBgStr.replace(/^\//, ''));
+      if (fs.existsSync(altPath)) {
+        resolvedBgPath = altPath;
       }
     }
+
+    if (finalBgStr.startsWith('http')) {
+      const bgRes = await fetchWithTimeout(finalBgStr, {}, 30000);
+      if (bgRes.ok) {
+        const bgUrlPath = finalBgStr.split('?')[0].split('#')[0];
+        let bgExt = path.extname(bgUrlPath).toLowerCase();
+        if (!bgExt) {
+          const ctype = (bgRes.headers.get('content-type') || '').toLowerCase();
+          bgExt = ctype.includes('video') ? '.mp4' : '.jpg';
+        }
+        tempBgPath = path.join(mediaDir, `temp_bg_${Date.now()}${bgExt}`);
+        fs.writeFileSync(tempBgPath, Buffer.from(await bgRes.arrayBuffer()));
+      }
+    } else if (fs.existsSync(resolvedBgPath)) {
+      tempBgPath = resolvedBgPath;
+    }
+
+    const isVideoBg = Boolean(
+      tempBgPath && (
+        tempBgPath.toLowerCase().endsWith('.mp4') ||
+        tempBgPath.toLowerCase().endsWith('.webm') ||
+        tempBgPath.toLowerCase().endsWith('.mov') ||
+        finalBgStr.toLowerCase().includes('.mp4') ||
+        finalBgStr.toLowerCase().includes('.webm')
+      )
+    );
 
     // 3. Ejecutar FFmpeg
     const videoFileName = `video_${Date.now()}.mp4`;
@@ -144,10 +166,12 @@ export default defineHandler(async (event) => {
       const photoX = Number(t.photo?.x) || 130;
       const photoY = Number(t.photo?.y) || 180;
 
-      const bgInput = tempBgPath ? `-loop 1 -framerate 1 -i "${tempBgPath}"` : `-f lavfi -i color=c=black:s=1080x1920:r=1`;
+      const bgInput = tempBgPath
+        ? (isVideoBg ? `-stream_loop -1 -i "${tempBgPath}"` : `-loop 1 -framerate 1 -i "${tempBgPath}"`)
+        : `-f lavfi -i color=c=black:s=1080x1920:r=1`;
 
-      // Escala del fondo sin deformarlo (crop centrado al formato vertical 1080x1920)
-      let filter = `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[bg_base];`;
+      // Escala del fondo sin deformarlo (crop centrado al formato vertical 1080x1920) y normaliza a 25fps
+      let filter = `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg_base];`;
       // Recorte dinámico basado en las dimensiones de la foto
       filter += `[0:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2[photo];`;
       // Overlay
@@ -155,6 +179,22 @@ export default defineHandler(async (event) => {
 
       let lastV = 'v1';
       let vIndex = 2;
+
+      // Visualización musical de la canción (showwaves)
+      const vis = t.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: 'white' };
+      if (vis.enabled !== false) {
+        const visW = Number(vis.w) || 820;
+        const visH = Number(vis.h) || 70;
+        const visX = vis.x === 'center' ? '(1080-w)/2' : (Number(vis.x) || 130);
+        const visY = Number(vis.y) || 1180;
+        const rawColor = vis.color || 'white';
+        const visColor = rawColor.startsWith('#') ? rawColor.replace('#', '0x') : rawColor;
+
+        filter += `;[2:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.1:0.1,format=yuva420p[wave]`;
+        filter += `;[${lastV}][wave]overlay=x=${visX}:y=${visY}[v${vIndex}]`;
+        lastV = `v${vIndex}`;
+        vIndex++;
+      }
       
       if (safeTitulo) {
         const xPos = t.titulo.align === 'center' ? '(w-text_w)/2' : t.titulo.x;
@@ -178,7 +218,8 @@ export default defineHandler(async (event) => {
       }
 
       const threads = getFfmpegThreads();
-      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" ${bgInput} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset ultrafast -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${videoPath}"`;
+      const tuneFlag = isVideoBg ? "" : "-tune stillimage";
+      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" ${bgInput} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset ultrafast ${tuneFlag} -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${videoPath}"`;
 
     } else {
       // Comportamiento fallback

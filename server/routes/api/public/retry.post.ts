@@ -243,16 +243,38 @@ async function processJob(job: any) {
     }
 
     // Handle background
+    const cleanBgName = path.basename(finalBgStr);
+    let resolvedBgPath = path.join(mediaDir, cleanBgName);
+    if (!fs.existsSync(resolvedBgPath)) {
+      const altPath = path.resolve(process.cwd(), "public", finalBgStr.replace(/^\//, ''));
+      if (fs.existsSync(altPath)) resolvedBgPath = altPath;
+    }
+
     if (finalBgStr.startsWith('http')) {
-      const bgRes = await fetchWithTimeout(finalBgStr, {}, 20000);
+      const bgRes = await fetchWithTimeout(finalBgStr, {}, 30000);
       if (bgRes.ok) {
-        tempBgPath = path.join(mediaDir, `temp_bg_${Date.now()}.jpg`);
+        const bgUrlPath = finalBgStr.split('?')[0].split('#')[0];
+        let bgExt = path.extname(bgUrlPath).toLowerCase();
+        if (!bgExt) {
+          const ctype = (bgRes.headers.get('content-type') || '').toLowerCase();
+          bgExt = ctype.includes('video') ? '.mp4' : '.jpg';
+        }
+        tempBgPath = path.join(mediaDir, `temp_bg_${Date.now()}${bgExt}`);
         fs.writeFileSync(tempBgPath, Buffer.from(await bgRes.arrayBuffer()));
       }
-    } else {
-      const localBgPath = path.join(mediaDir, path.basename(finalBgStr));
-      if (fs.existsSync(localBgPath)) tempBgPath = localBgPath;
+    } else if (fs.existsSync(resolvedBgPath)) {
+      tempBgPath = resolvedBgPath;
     }
+
+    const isVideoBg = Boolean(
+      tempBgPath && (
+        tempBgPath.toLowerCase().endsWith('.mp4') ||
+        tempBgPath.toLowerCase().endsWith('.webm') ||
+        tempBgPath.toLowerCase().endsWith('.mov') ||
+        finalBgStr.toLowerCase().includes('.mp4') ||
+        finalBgStr.toLowerCase().includes('.webm')
+      )
+    );
 
     const videoFileName = `video_${Date.now()}.mp4`;
     const videoPath = path.join(mediaDir, videoFileName);
@@ -300,9 +322,11 @@ async function processJob(job: any) {
     const photoX = Number(t.photo?.x) || 130;
     const photoY = Number(t.photo?.y) || 180;
 
-    const bgInput = tempBgPath ? `-loop 1 -framerate 1 -i "${tempBgPath}"` : `-f lavfi -i color=c=black:s=1080x1920:r=1`;
+    const bgInput = tempBgPath
+      ? (isVideoBg ? `-stream_loop -1 -i "${tempBgPath}"` : `-loop 1 -framerate 1 -i "${tempBgPath}"`)
+      : `-f lavfi -i color=c=black:s=1080x1920:r=1`;
 
-    let filter = `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[bg_base];`;
+    let filter = `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg_base];`;
     
     if (tempPhotoPath) {
       filter += `[0:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2[photo];`;
@@ -313,6 +337,22 @@ async function processJob(job: any) {
 
     let lastV = 'v1';
     let vIndex = 2;
+
+    // Visualización musical sincronizada (showwaves)
+    const vis = t.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: 'white' };
+    if (vis.enabled !== false) {
+      const visW = Number(vis.w) || 820;
+      const visH = Number(vis.h) || 70;
+      const visX = vis.x === 'center' ? '(1080-w)/2' : (Number(vis.x) || 130);
+      const visY = Number(vis.y) || 1180;
+      const rawColor = vis.color || 'white';
+      const visColor = rawColor.startsWith('#') ? rawColor.replace('#', '0x') : rawColor;
+
+      filter += `;[2:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.1:0.1,format=yuva420p[wave]`;
+      filter += `;[${lastV}][wave]overlay=x=${visX}:y=${visY}[v${vIndex}]`;
+      lastV = `v${vIndex}`;
+      vIndex++;
+    }
     
     if (safeTitulo) {
       const xPos = t.titulo.align === 'center' ? '(w-text_w)/2' : t.titulo.x;
@@ -334,9 +374,10 @@ async function processJob(job: any) {
       vIndex++;
     }
 
-    const inputs = tempPhotoPath ? `-i "${tempPhotoPath}" ${bgInput}` : `-f lavfi -i color=c=black:s=1x1 ${bgInput}`;
+    const inputs = tempPhotoPath ? `-loop 1 -framerate 1 -i "${tempPhotoPath}" ${bgInput}` : `-f lavfi -i color=c=black:s=1x1 ${bgInput}`;
     const threads = getFfmpegThreads();
-    const ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 ${inputs} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset ultrafast -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${videoPath}"`;
+    const tuneFlag = isVideoBg ? "" : "-tune stillimage";
+    const ffmpegCommand = `ffmpeg -y -threads ${threads} ${inputs} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset ultrafast ${tuneFlag} -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${videoPath}"`;
 
     await runFfmpeg(ffmpegCommand);
 

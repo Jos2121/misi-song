@@ -92,6 +92,7 @@ export default function Landing() {
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [visualizer, setVisualizer] = useState({ enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewScale, setPreviewScale] = useState(0.5);
@@ -112,6 +113,7 @@ export default function Landing() {
     dedicatoriaX: dedicatoriaX,
     dedicatoriaY: Number(dedicatoriaY),
     dedicatoriaSize: Number(dedicatoriaSize),
+    visualizer: visualizer,
     photo: { x: Number(photoX), y: Number(photoY), w: Number(photoWidth), h: Number(photoHeight) },
     titulo: { ...baseConfig.titulo, x: tituloX, y: Number(tituloY), fontSize: Number(tituloSize) },
     artista: { ...baseConfig.artista, x: artistaX, y: Number(artistaY), fontSize: Number(artistaSize) },
@@ -214,6 +216,12 @@ export default function Landing() {
     if (dX !== undefined) setDedicatoriaX(dX);
     if (dY !== undefined) setDedicatoriaY(Number(dY));
     if (dSize !== undefined) setDedicatoriaSize(Number(dSize));
+
+    if (configData.visualizer !== undefined) {
+      setVisualizer(configData.visualizer);
+    } else {
+      setVisualizer({ enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' });
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -906,6 +914,7 @@ export default function Landing() {
                   dedicatoriaX={dedicatoriaX}
                   dedicatoriaY={dedicatoriaY}
                   dedicatoriaSize={dedicatoriaSize}
+                  visualizer={visualizer}
                   
                   scale={previewScale}
                 />
@@ -1013,6 +1022,7 @@ export default function Landing() {
                 dedicatoriaX={dedicatoriaX}
                 dedicatoriaY={dedicatoriaY}
                 dedicatoriaSize={dedicatoriaSize}
+                visualizer={visualizer}
                 
                 scale={previewScale * 1.1} // Slightly larger for the drawer
               />
