@@ -116,7 +116,7 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
     if (align === 'center') {
       styleObj.left = '50%';
       styleObj.transform = 'translateX(-50%)';
-      styleObj.width = key === 'dedicatoria' ? 'max-content' : '84%';
+      styleObj.width = '84%';
       styleObj.maxWidth = '84%';
     } else if (align === 'right') {
       styleObj.right = '8%';

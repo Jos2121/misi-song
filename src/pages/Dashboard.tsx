@@ -857,10 +857,25 @@ export default function Dashboard() {
         nextConfig.bgUrl = String(nextConfig.bgUrl).trim();
       }
       
-      if (!nextConfig.dedicatoria) {
-        nextConfig.dedicatoria = { ...DEFAULT_TEMPLATE.dedicatoria };
-      }
-      
+      if (!nextConfig.titulo) nextConfig.titulo = { ...DEFAULT_TEMPLATE.titulo };
+      if (!nextConfig.artista) nextConfig.artista = { ...DEFAULT_TEMPLATE.artista };
+      if (!nextConfig.dedicatoria) nextConfig.dedicatoria = { ...DEFAULT_TEMPLATE.dedicatoria };
+      if (!nextConfig.photo) nextConfig.photo = { ...DEFAULT_TEMPLATE.photo };
+
+      if (configData.tituloColor) nextConfig.titulo.color = configData.tituloColor;
+      if (configData.tituloAlign) nextConfig.titulo.align = configData.tituloAlign;
+      if (configData.tituloVisible !== undefined) nextConfig.titulo.visible = configData.tituloVisible;
+
+      if (configData.artistaColor) nextConfig.artista.color = configData.artistaColor;
+      if (configData.artistaAlign) nextConfig.artista.align = configData.artistaAlign;
+      if (configData.artistaVisible !== undefined) nextConfig.artista.visible = configData.artistaVisible;
+
+      if (configData.dedicatoriaColor) nextConfig.dedicatoria.color = configData.dedicatoriaColor;
+      if (configData.dedicatoriaAlign) nextConfig.dedicatoria.align = configData.dedicatoriaAlign;
+      if (configData.dedicatoriaVisible !== undefined) nextConfig.dedicatoria.visible = configData.dedicatoriaVisible;
+
+      if (configData.photoFrame !== undefined) nextConfig.photo.frame = configData.photoFrame;
+
       if (configData.dedicatoriaX !== undefined) nextConfig.dedicatoria.x = Number(configData.dedicatoriaX);
       else if (configData.dedicatoryX !== undefined) nextConfig.dedicatoria.x = Number(configData.dedicatoryX);
 

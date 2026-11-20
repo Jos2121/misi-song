@@ -28,18 +28,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { VideoEditorPreview } from '@/components/VideoEditorPreview';
-import { TemplateConfig } from './Dashboard';
+import { TemplateConfig, DEFAULT_TEMPLATE } from './Dashboard';
 import { usePlatformSettings } from '@/context/PlatformSettingsContext';
-
-const DEFAULT_CONFIG: TemplateConfig = {
-  id: '',
-  name: 'Plantilla por Defecto',
-  bgUrl: '',
-  photo: { x: 130, y: 180, w: 820, h: 820 },
-  titulo: { x: 130, y: 1040, fontSize: 42, color: 'white', align: 'left' },
-  artista: { x: 130, y: 1095, fontSize: 30, color: '#B3B3B3', align: 'left' },
-  dedicatoria: { x: 540, y: 1620, fontSize: 28, color: '#E5E5E5', align: 'center' }
-};
 
 export default function Landing() {
   const { appTitle, appLogo } = usePlatformSettings();
@@ -49,7 +39,7 @@ export default function Landing() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [templates, setTemplates] = useState<{id: string, name: string, backgroundUrl: string, config: TemplateConfig}[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [baseConfig, setBaseConfig] = useState<TemplateConfig>(DEFAULT_CONFIG);
+  const [baseConfig, setBaseConfig] = useState<TemplateConfig>(DEFAULT_TEMPLATE);
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   
   // Coordinate & Size states
@@ -57,18 +47,28 @@ export default function Landing() {
   const [photoY, setPhotoY] = useState<number>(180);
   const [photoWidth, setPhotoWidth] = useState<number>(820);
   const [photoHeight, setPhotoHeight] = useState<number>(820);
+  const [photoFrame, setPhotoFrame] = useState<boolean>(true);
   
   const [tituloX, setTituloX] = useState<number | string>(130);
   const [tituloY, setTituloY] = useState<number>(1040);
-  const [tituloSize, setTituloSize] = useState<number>(42);
+  const [tituloSize, setTituloSize] = useState<number>(44);
+  const [tituloColor, setTituloColor] = useState<string>('white');
+  const [tituloAlign, setTituloAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [tituloVisible, setTituloVisible] = useState<boolean>(true);
   
   const [artistaX, setArtistaX] = useState<number | string>(130);
-  const [artistaY, setArtistaY] = useState<number>(1095);
-  const [artistaSize, setArtistaSize] = useState<number>(30);
+  const [artistaY, setArtistaY] = useState<number>(1100);
+  const [artistaSize, setArtistaSize] = useState<number>(32);
+  const [artistaColor, setArtistaColor] = useState<string>('#B3B3B3');
+  const [artistaAlign, setArtistaAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [artistaVisible, setArtistaVisible] = useState<boolean>(true);
   
   const [dedicatoriaX, setDedicatoriaX] = useState<number | string>(540);
   const [dedicatoriaY, setDedicatoriaY] = useState<number>(1620);
-  const [dedicatoriaSize, setDedicatoriaSize] = useState<number>(28);
+  const [dedicatoriaSize, setDedicatoriaSize] = useState<number>(30);
+  const [dedicatoriaColor, setDedicatoriaColor] = useState<string>('#E5E5E5');
+  const [dedicatoriaAlign, setDedicatoriaAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [dedicatoriaVisible, setDedicatoriaVisible] = useState<boolean>(true);
 
   // User input states
   const [userPhotoUrl, setUserPhotoUrl] = useState<string>('');
@@ -99,25 +99,42 @@ export default function Landing() {
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
   // Computed config for the preview & payload
-  const constructedConfig: any = {
-    photoX: Number(photoX),
-    photoY: Number(photoY),
-    photoWidth: Number(photoWidth),
-    photoHeight: Number(photoHeight),
-    tituloX: tituloX,
-    tituloY: Number(tituloY),
-    tituloSize: Number(tituloSize),
-    artistaX: artistaX,
-    artistaY: Number(artistaY),
-    artistaSize: Number(artistaSize),
-    dedicatoriaX: dedicatoriaX,
-    dedicatoriaY: Number(dedicatoriaY),
-    dedicatoriaSize: Number(dedicatoriaSize),
-    visualizer: visualizer,
-    photo: { x: Number(photoX), y: Number(photoY), w: Number(photoWidth), h: Number(photoHeight) },
-    titulo: { ...baseConfig.titulo, x: tituloX, y: Number(tituloY), fontSize: Number(tituloSize) },
-    artista: { ...baseConfig.artista, x: artistaX, y: Number(artistaY), fontSize: Number(artistaSize) },
-    dedicatoria: { ...baseConfig.dedicatoria, x: dedicatoriaX, y: Number(dedicatoriaY), fontSize: Number(dedicatoriaSize) }
+  const constructedConfig: TemplateConfig = {
+    id: selectedTemplateId,
+    name: baseConfig.name || 'Plantilla',
+    bgUrl: backgroundUrl,
+    photo: {
+      x: Number(photoX),
+      y: Number(photoY),
+      w: Number(photoWidth),
+      h: Number(photoHeight),
+      frame: photoFrame
+    },
+    titulo: {
+      x: tituloX,
+      y: Number(tituloY),
+      fontSize: Number(tituloSize),
+      color: tituloColor,
+      align: tituloAlign,
+      visible: tituloVisible
+    },
+    artista: {
+      x: artistaX,
+      y: Number(artistaY),
+      fontSize: Number(artistaSize),
+      color: artistaColor,
+      align: artistaAlign,
+      visible: artistaVisible
+    },
+    dedicatoria: {
+      x: dedicatoriaX,
+      y: Number(dedicatoriaY),
+      fontSize: Number(dedicatoriaSize),
+      color: dedicatoriaColor,
+      align: dedicatoriaAlign,
+      visible: dedicatoriaVisible
+    },
+    visualizer: visualizer
   };
 
   // Resize observer to maintain preview scale
@@ -179,49 +196,73 @@ export default function Landing() {
       setUserPhotoUrl(String(configData.photoUrl).trim());
     }
     
-    if (configData.photoX !== undefined) setPhotoX(Number(configData.photoX));
-    else if (configData.photo?.x !== undefined) setPhotoX(Number(configData.photo.x));
+    const pX = configData.photoX ?? configData.photo?.x ?? 130;
+    const pY = configData.photoY ?? configData.photo?.y ?? 180;
+    const pW = configData.photoWidth ?? configData.photo?.w ?? 820;
+    const pH = configData.photoHeight ?? configData.photo?.h ?? 820;
+    const pFrame = configData.photoFrame ?? configData.photo?.frame ?? true;
 
-    if (configData.photoY !== undefined) setPhotoY(Number(configData.photoY));
-    else if (configData.photo?.y !== undefined) setPhotoY(Number(configData.photo.y));
+    setPhotoX(Number(pX));
+    setPhotoY(Number(pY));
+    setPhotoWidth(Number(pW));
+    setPhotoHeight(Number(pH));
+    setPhotoFrame(pFrame !== false);
 
-    if (configData.photoWidth !== undefined) setPhotoWidth(Number(configData.photoWidth));
-    else if (configData.photo?.w !== undefined) setPhotoWidth(Number(configData.photo.w));
+    const tX = configData.tituloX ?? configData.titulo?.x ?? 130;
+    const tY = configData.tituloY ?? configData.titulo?.y ?? 1040;
+    const tSize = configData.tituloSize ?? configData.titulo?.fontSize ?? 44;
+    const tColor = configData.tituloColor ?? configData.titulo?.color ?? 'white';
+    const tAlign = configData.tituloAlign ?? configData.titulo?.align ?? 'left';
+    const tVis = configData.tituloVisible ?? configData.titulo?.visible ?? true;
 
-    if (configData.photoHeight !== undefined) setPhotoHeight(Number(configData.photoHeight));
-    else if (configData.photo?.h !== undefined) setPhotoHeight(Number(configData.photo.h));
+    setTituloX(tX);
+    setTituloY(Number(tY));
+    setTituloSize(Number(tSize));
+    setTituloColor(tColor);
+    setTituloAlign(tAlign);
+    setTituloVisible(tVis !== false);
 
-    if (configData.tituloX !== undefined) setTituloX(configData.tituloX);
-    else if (configData.titulo?.x !== undefined) setTituloX(configData.titulo.x);
+    const aX = configData.artistaX ?? configData.artista?.x ?? 130;
+    const aY = configData.artistaY ?? configData.artista?.y ?? 1100;
+    const aSize = configData.artistaSize ?? configData.artista?.fontSize ?? 32;
+    const aColor = configData.artistaColor ?? configData.artista?.color ?? '#B3B3B3';
+    const aAlign = configData.artistaAlign ?? configData.artista?.align ?? 'left';
+    const aVis = configData.artistaVisible ?? configData.artista?.visible ?? true;
 
-    if (configData.tituloY !== undefined) setTituloY(Number(configData.tituloY));
-    else if (configData.titulo?.y !== undefined) setTituloY(Number(configData.titulo.y));
+    setArtistaX(aX);
+    setArtistaY(Number(aY));
+    setArtistaSize(Number(aSize));
+    setArtistaColor(aColor);
+    setArtistaAlign(aAlign);
+    setArtistaVisible(aVis !== false);
 
-    if (configData.tituloSize !== undefined) setTituloSize(Number(configData.tituloSize));
-    else if (configData.titulo?.fontSize !== undefined) setTituloSize(Number(configData.titulo.fontSize));
-
-    if (configData.artistaX !== undefined) setArtistaX(configData.artistaX);
-    else if (configData.artista?.x !== undefined) setArtistaX(configData.artista.x);
-
-    if (configData.artistaY !== undefined) setArtistaY(Number(configData.artistaY));
-    else if (configData.artista?.y !== undefined) setArtistaY(Number(configData.artista.y));
-
-    if (configData.artistaSize !== undefined) setArtistaSize(Number(configData.artistaSize));
-    else if (configData.artista?.fontSize !== undefined) setArtistaSize(Number(configData.artista.fontSize));
-
-    const dX = configData.dedicatoriaX ?? configData.dedicatoryX ?? configData.dedicatoria?.x;
-    const dY = configData.dedicatoriaY ?? configData.dedicatoryY ?? configData.dedicatoria?.y;
-    let dSize = configData.dedicatoriaSize ?? configData.dedicatorySize ?? configData.dedicatoria?.fontSize;
+    const dX = configData.dedicatoriaX ?? configData.dedicatoryX ?? configData.dedicatoria?.x ?? 540;
+    const dY = configData.dedicatoriaY ?? configData.dedicatoryY ?? configData.dedicatoria?.y ?? 1620;
+    const dSize = configData.dedicatoriaSize ?? configData.dedicatorySize ?? configData.dedicatoria?.fontSize ?? 30;
+    const dColor = configData.dedicatoriaColor ?? configData.dedicatoria?.color ?? '#E5E5E5';
+    const dAlign = configData.dedicatoriaAlign ?? configData.dedicatoria?.align ?? 'center';
+    const dVis = configData.dedicatoriaVisible ?? configData.dedicatoria?.visible ?? true;
     
-    if (dX !== undefined) setDedicatoriaX(dX);
-    if (dY !== undefined) setDedicatoriaY(Number(dY));
-    if (dSize !== undefined) setDedicatoriaSize(Number(dSize));
+    setDedicatoriaX(dX);
+    setDedicatoriaY(Number(dY));
+    setDedicatoriaSize(Number(dSize));
+    setDedicatoriaColor(dColor);
+    setDedicatoriaAlign(dAlign);
+    setDedicatoriaVisible(dVis !== false);
 
-    if (configData.visualizer !== undefined) {
-      setVisualizer(configData.visualizer);
-    } else {
-      setVisualizer({ enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' });
-    }
+    const vis = configData.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' };
+    setVisualizer(vis);
+
+    setBaseConfig({
+      id: t.id,
+      name: t.name || 'Plantilla',
+      bgUrl: configData.bgUrl || t.bgUrl || '',
+      photo: { x: Number(pX), y: Number(pY), w: Number(pW), h: Number(pH), frame: pFrame !== false },
+      titulo: { x: tX, y: Number(tY), fontSize: Number(tSize), color: tColor, align: tAlign, visible: tVis !== false },
+      artista: { x: aX, y: Number(aY), fontSize: Number(aSize), color: aColor, align: aAlign, visible: aVis !== false },
+      dedicatoria: { x: dX, y: Number(dY), fontSize: Number(dSize), color: dColor, align: dAlign, visible: dVis !== false },
+      visualizer: vis
+    });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -900,22 +941,6 @@ export default function Landing() {
                   titulo={titulo}
                   artista={artista}
                   dedicatoria={dedicatoria}
-                  
-                  photoX={photoX}
-                  photoY={photoY}
-                  photoWidth={photoWidth}
-                  photoHeight={photoHeight}
-                  tituloX={tituloX}
-                  tituloY={tituloY}
-                  tituloSize={tituloSize}
-                  artistaX={artistaX}
-                  artistaY={artistaY}
-                  artistaSize={artistaSize}
-                  dedicatoriaX={dedicatoriaX}
-                  dedicatoriaY={dedicatoriaY}
-                  dedicatoriaSize={dedicatoriaSize}
-                  visualizer={visualizer}
-                  
                   scale={previewScale}
                 />
                 
@@ -1008,22 +1033,6 @@ export default function Landing() {
                 titulo={titulo}
                 artista={artista}
                 dedicatoria={dedicatoria}
-                
-                photoX={photoX}
-                photoY={photoY}
-                photoWidth={photoWidth}
-                photoHeight={photoHeight}
-                tituloX={tituloX}
-                tituloY={tituloY}
-                tituloSize={tituloSize}
-                artistaX={artistaX}
-                artistaY={artistaY}
-                artistaSize={artistaSize}
-                dedicatoriaX={dedicatoriaX}
-                dedicatoriaY={dedicatoriaY}
-                dedicatoriaSize={dedicatoriaSize}
-                visualizer={visualizer}
-                
                 scale={previewScale * 1.1} // Slightly larger for the drawer
               />
               <div className="absolute inset-0 pointer-events-none border-[12px] border-white/5 rounded-[32px]" />

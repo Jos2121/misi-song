@@ -6,12 +6,16 @@ export default defineHandler(async () => {
     await ensureSchema();
     const result = await pool.query('SELECT * FROM "CustomTemplate" ORDER BY "createdAt" DESC');
 
-    return result.rows.map((row) => ({
-      id: `db_${row.id}`,
-      name: row.name,
-      bgUrl: row.bgUrl,
-      ...row.config,
-    }));
+    return result.rows.map((row) => {
+      const parsedConfig = typeof row.config === "string" ? JSON.parse(row.config) : (row.config || {});
+      return {
+        id: `db_${row.id}`,
+        name: row.name,
+        bgUrl: row.bgUrl,
+        config: parsedConfig,
+        ...parsedConfig,
+      };
+    });
   } catch (error) {
     console.error(error);
     return [];
