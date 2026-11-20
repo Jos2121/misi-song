@@ -240,11 +240,15 @@ export default defineHandler(async (event) => {
         vIndex++;
       }
       
-      const fontFileRelative = "public/fonts/cursive.ttf";
-      const fontFileOnDisk = path.resolve(process.cwd(), fontFileRelative);
-      const fontParam = fs.existsSync(fontFileOnDisk)
-        ? `:fontfile='${fontFileRelative}'`
-        : `:font='Segoe Script'`;
+      const fontCandidates = [
+        path.resolve(process.cwd(), "public/fonts/cursive.ttf"),
+        path.resolve(process.cwd(), "App Cursea/public/fonts/cursive.ttf"),
+        "C:/Windows/Fonts/segoesc.ttf",
+        "C:/Windows/Fonts/segoepr.ttf"
+      ];
+      const resolvedFont = fontCandidates.find(f => fs.existsSync(f)) || "C:/Windows/Fonts/segoesc.ttf";
+      const escapedFontPath = resolvedFont.replace(/\\/g, '/').replace(':', '\\:');
+      const fontParam = `:fontfile='${escapedFontPath}'`;
 
       if (t.titulo?.visible !== false && safeTitulo) {
         const align = t.titulo?.align || 'left';
@@ -279,9 +283,9 @@ export default defineHandler(async (event) => {
         tempDedPath = path.join(mediaDir, tempDedFileName);
         // Escribe las líneas reales en UTF-8 para renderizado perfecto de acentos y saltos de línea
         fs.writeFileSync(tempDedPath, escapedDedicatoria.replace(/\\n/g, "\n"), "utf8");
-        const relDedPath = `public/media/${tempDedFileName}`;
+        const escapedDedPath = tempDedPath.replace(/\\/g, '/').replace(':', '\\:');
 
-        filter += `;[${lastV}]drawtext=textfile='${relDedPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yCoord}:line_spacing=${Math.round(sz * 0.4)}[v${vIndex}]`;
+        filter += `;[${lastV}]drawtext=textfile='${escapedDedPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yCoord}:line_spacing=${Math.round(sz * 0.4)}[v${vIndex}]`;
         lastV = `v${vIndex}`;
         vIndex++;
       }
