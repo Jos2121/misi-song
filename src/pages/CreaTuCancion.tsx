@@ -774,7 +774,7 @@ export default function CreaTuCancion() {
 
                 <div className="pb-6 mb-6 border-b border-[#8B1F32]/10 flex items-baseline gap-2">
                   <span className="text-4xl sm:text-5xl font-serif font-bold text-[#8B1F32]">
-                    {currency === 'PEN' ? 'S/ 35' : '$12'}
+                    {currency === 'PEN' ? 'S/ 39' : '$12'}
                   </span>
                   <span className="text-sm font-semibold text-neutral-500">
                     {currency === 'PEN' ? 'soles • pago único' : 'dólares USD • pago único'}
@@ -814,7 +814,7 @@ export default function CreaTuCancion() {
 
           <div className="mt-10 bg-[#F5EADC]/50 border border-[#8B1F32]/15 rounded-2xl p-5 text-center max-w-3xl mx-auto">
             <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed">
-              <strong className="text-[#8B1F32]">¿Cuál te conviene?</strong> Elige la <strong>Estándar</strong> ({currency === 'PEN' ? 'S/ 19' : '$7'}) si buscas rapidez en <strong>30 minutos</strong> con un estilo musical nuevo. Elige <strong>Inspirada en tu Canción Favorita</strong> ({currency === 'PEN' ? 'S/ 35' : '$12'}) si deseas que nuestro equipo dedique <strong>2 a 3 horas</strong> a recrear la vibra de una canción original especial para ustedes.
+              <strong className="text-[#8B1F32]">¿Cuál te conviene?</strong> Elige la <strong>Estándar</strong> ({currency === 'PEN' ? 'S/ 19' : '$7'}) si buscas rapidez en <strong>30 minutos</strong> con un estilo musical nuevo. Elige <strong>Inspirada en tu Canción Favorita</strong> ({currency === 'PEN' ? 'S/ 39' : '$12'}) si deseas que nuestro equipo dedique <strong>2 a 3 horas</strong> a recrear la vibra de una canción original especial para ustedes.
             </p>
           </div>
         </div>

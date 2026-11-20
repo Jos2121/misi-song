@@ -556,7 +556,7 @@ export default function Landing() {
                     </p>
                   </div>
                   <div className="pt-2 border-t border-[#8B1F32]/10 flex items-baseline justify-between">
-                    <span className="text-2xl font-serif font-bold text-[#8B1F32]">S/ 35</span>
+                    <span className="text-2xl font-serif font-bold text-[#8B1F32]">S/ 39</span>
                     <span className="text-xs font-semibold text-neutral-500">o $12 USD</span>
                   </div>
                 </button>
