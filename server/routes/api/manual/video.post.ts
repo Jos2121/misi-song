@@ -333,12 +333,12 @@ export default defineHandler(async (event) => {
 
       const threads = getFfmpegThreads();
       const tuneFlag = isVideoBg ? "" : "-tune stillimage";
-      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" ${bgInput} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset ultrafast ${tuneFlag} -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${videoPath}"`;
+      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" ${bgInput} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k ${tuneFlag} -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
 
     } else {
       // Comportamiento fallback
       const threads = getFfmpegThreads();
-      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" -i "${audioPath}" -c:v libx264 -preset ultrafast -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${videoPath}"`;
+      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" -i "${audioPath}" -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
     }
 
     await runFfmpeg(ffmpegCommand);

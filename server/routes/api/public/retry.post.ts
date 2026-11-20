@@ -491,7 +491,7 @@ async function processJob(job: any) {
     const inputs = tempPhotoPath ? `-loop 1 -framerate 1 -i "${tempPhotoPath}" ${bgInput}` : `-f lavfi -i color=c=black:s=1x1 ${bgInput}`;
     const threads = getFfmpegThreads();
     const tuneFlag = isVideoBg ? "" : "-tune stillimage";
-    const ffmpegCommand = `ffmpeg -y -threads ${threads} ${inputs} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset ultrafast ${tuneFlag} -c:a aac -b:a 192k -pix_fmt yuv420p -shortest "${videoPath}"`;
+    const ffmpegCommand = `ffmpeg -y -threads ${threads} ${inputs} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k ${tuneFlag} -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
 
     await runFfmpeg(ffmpegCommand);
 
