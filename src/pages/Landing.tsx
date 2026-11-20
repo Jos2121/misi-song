@@ -306,8 +306,9 @@ export default function Landing() {
     const missingCommon =
       !selectedTemplateId ||
       !userPhotoUrl ||
-      !titulo ||
-      !artista ||
+      (tituloVisible !== false && !titulo.trim()) ||
+      (artistaVisible !== false && !artista.trim()) ||
+      (dedicatoriaVisible !== false && !dedicatoria.trim()) ||
       !whatsappNumber ||
       !finalParaQuien ||
       !nombreDedicado ||
@@ -335,9 +336,9 @@ export default function Landing() {
           plan,
           backgroundUrl,
           userPhotoUrl,
-          titulo,
-          artista,
-          dedicatoria,
+          titulo: tituloVisible !== false ? titulo : '',
+          artista: artistaVisible !== false ? artista : '',
+          dedicatoria: dedicatoriaVisible !== false ? dedicatoria : '',
           whatsappNumber,
           config: constructedConfig,
           paraQuien: finalParaQuien,
@@ -825,45 +826,53 @@ export default function Landing() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Título de la Canción</Label>
-                      <span className="text-[10px] text-neutral-400 font-mono">{titulo.length}/25</span>
+                  {tituloVisible !== false && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Título</Label>
+                        <span className="text-[10px] text-neutral-400 font-mono">{titulo.length}/25</span>
+                      </div>
+                      <Input
+                        value={titulo}
+                        onChange={e => setTitulo(e.target.value)}
+                        placeholder="Ej. Nuestra Historia Eterna"
+                        className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all"
+                        maxLength={25}
+                      />
                     </div>
-                    <Input
-                      value={titulo}
-                      onChange={e => setTitulo(e.target.value)}
-                      placeholder="Ej. Nuestra Historia Eterna"
-                      className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all"
-                      maxLength={25}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Firma</Label>
-                      <span className="text-[10px] text-neutral-400 font-mono">{artista.length}/25</span>
+                  )}
+
+                  {artistaVisible !== false && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Firma</Label>
+                        <span className="text-[10px] text-neutral-400 font-mono">{artista.length}/25</span>
+                      </div>
+                      <Input
+                        value={artista}
+                        onChange={e => setArtista(e.target.value)}
+                        placeholder="Ej. Juan y María / Tu Firma"
+                        className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all"
+                        maxLength={25}
+                      />
                     </div>
-                    <Input
-                      value={artista}
-                      onChange={e => setArtista(e.target.value)}
-                      placeholder="Ej. Juan y María / Tu Firma"
-                      className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all"
-                      maxLength={25}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Dedicatoria Final</Label>
-                      <span className="text-[10px] text-neutral-400 font-mono">{dedicatoria.length}/70</span>
+                  )}
+
+                  {dedicatoriaVisible !== false && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Dedicatoria Final</Label>
+                        <span className="text-[10px] text-neutral-400 font-mono">{dedicatoria.length}/70</span>
+                      </div>
+                      <Textarea
+                        value={dedicatoria}
+                        onChange={e => setDedicatoria(e.target.value)}
+                        placeholder="Un pequeño mensaje de amor para el cierre..."
+                        className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all resize-none min-h-[100px]"
+                        maxLength={70}
+                      />
                     </div>
-                    <Textarea
-                      value={dedicatoria}
-                      onChange={e => setDedicatoria(e.target.value)}
-                      placeholder="Un pequeño mensaje de amor para el cierre..."
-                      className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all resize-none min-h-[100px]"
-                      maxLength={70}
-                    />
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

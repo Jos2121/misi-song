@@ -50,12 +50,17 @@ export default defineHandler(async (event) => {
 
     if (targetImage.startsWith("http")) {
       // Es una URL externa: descargarla
-      const imageRes = await fetchWithTimeout(targetImage, {}, 20000);
-      if (!imageRes.ok) throw new Error(`Failed to download image from ${targetImage}`);
-      const arrayBuffer = await imageRes.arrayBuffer();
-      tempImagePath = path.join(mediaDir, `temp_photo_${Date.now()}.jpg`);
-      fs.writeFileSync(tempImagePath, Buffer.from(arrayBuffer));
-      finalImagePath = tempImagePath;
+      try {
+        const imageRes = await fetchWithTimeout(targetImage, {}, 20000);
+        if (imageRes.ok) {
+          const arrayBuffer = await imageRes.arrayBuffer();
+          tempImagePath = path.join(mediaDir, `temp_photo_${Date.now()}.jpg`);
+          fs.writeFileSync(tempImagePath, Buffer.from(arrayBuffer));
+          finalImagePath = tempImagePath;
+        }
+      } catch (err) {
+        console.warn("Error descargando imagen externa:", err);
+      }
     } else if (targetImage.startsWith("data:image/")) {
       // Es una imagen en base64 (subida local en el frontend)
       const matches = targetImage.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
@@ -68,14 +73,31 @@ export default defineHandler(async (event) => {
       } else {
         throw createError({ statusCode: 400, statusMessage: "Invalid base64 image format" });
       }
-    } else if (targetImage.startsWith("/media/")) {
-      // Es un archivo local que ya existe en el disco
-      finalImagePath = path.join(mediaDir, path.basename(targetImage));
-      if (!fs.existsSync(finalImagePath)) {
-        throw createError({ statusCode: 404, statusMessage: "Local image file not found on disk" });
+    }
+
+    if (!finalImagePath) {
+      // Búsqueda inteligente de archivo local
+      const cleanImgName = path.basename(targetImage.split('?')[0].split('#')[0]);
+      const candidates = [
+        path.join(mediaDir, cleanImgName),
+        path.resolve(process.cwd(), "public", targetImage.replace(/^\//, '')),
+        path.resolve(process.cwd(), "public/media", cleanImgName),
+        path.resolve(process.cwd(), "public/images", cleanImgName),
+        path.resolve(process.cwd(), "public", cleanImgName),
+        path.resolve(process.cwd(), "public/images/hero-cover.png")
+      ];
+
+      const foundPath = candidates.find(p => fs.existsSync(p));
+      if (foundPath) {
+        finalImagePath = foundPath;
+      } else {
+        const fallbackImg = path.resolve(process.cwd(), "public/images/hero-cover.png");
+        if (fs.existsSync(fallbackImg)) {
+          finalImagePath = fallbackImg;
+        } else {
+          throw createError({ statusCode: 404, statusMessage: "Local image file not found on disk" });
+        }
       }
-    } else {
-      throw createError({ statusCode: 400, statusMessage: "Invalid image URL format" });
     }
 
     // Handle background (download if URL, otherwise check local file)

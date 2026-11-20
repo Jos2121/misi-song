@@ -1595,62 +1595,101 @@ export default function Dashboard() {
                         <button
                           onClick={() => {
                             setRegenerateJobId(job.id);
-                            const bg = job.backgroundUrl || '';
-                              setRegenerateBgUrl(bg);
-                              setRegenerateCustomBg(bg);
-                              setRegenerateUserPhotoUrl(job.userPhotoUrl || '');
-                              setRegenerateTitulo(job.titulo || '');
-                              setRegenerateArtista(job.artista || '');
-                              setRegenerateDedicatoria(job.dedicatoria || '');
-                              
-                              let parsedConfig: any = null;
-                              if (job.config) {
-                                try {
-                                  parsedConfig = typeof job.config === 'string' ? JSON.parse(job.config) : job.config;
-                                  if (typeof parsedConfig === 'string') parsedConfig = JSON.parse(parsedConfig);
-                                } catch(e) { console.error(e); }
-                              }
 
-                              if (parsedConfig) {
-                                const dedSize = parsedConfig.dedicatoriaSize ?? parsedConfig.dedicatorySize ?? parsedConfig.dedicatoria?.fontSize ?? 28;
-                                setRegenerateDedicatoriaSize(Number(dedSize));
-                                const newConfig: TemplateConfig = {
-                                  ...DEFAULT_TEMPLATE,
-                                  id: parsedConfig.id || '',
-                                  name: parsedConfig.name || 'Plantilla Cliente',
-                                  bgUrl: parsedConfig.backgroundUrl || parsedConfig.bgUrl || bg,
-                                  photo: {
-                                    x: Number(parsedConfig.photoX ?? parsedConfig.photo?.x ?? 130),
-                                    y: Number(parsedConfig.photoY ?? parsedConfig.photo?.y ?? 180),
-                                    w: Number(parsedConfig.photoWidth ?? parsedConfig.photo?.w ?? 820),
-                                    h: Number(parsedConfig.photoHeight ?? parsedConfig.photo?.h ?? 820)
-                                  },
-                                  titulo: {
-                                    ...DEFAULT_TEMPLATE.titulo,
-                                    x: parsedConfig.tituloX ?? parsedConfig.titulo?.x ?? 130,
-                                    y: Number(parsedConfig.tituloY ?? parsedConfig.titulo?.y ?? 1040),
-                                    fontSize: Number(parsedConfig.tituloSize ?? parsedConfig.titulo?.fontSize ?? 42)
-                                  },
-                                  artista: {
-                                    ...DEFAULT_TEMPLATE.artista,
-                                    x: parsedConfig.artistaX ?? parsedConfig.artista?.x ?? 130,
-                                    y: Number(parsedConfig.artistaY ?? parsedConfig.artista?.y ?? 1095),
-                                    fontSize: Number(parsedConfig.artistaSize ?? parsedConfig.artista?.fontSize ?? 30)
-                                  },
-                                  dedicatoria: {
-                                    ...DEFAULT_TEMPLATE.dedicatoria,
-                                    x: parsedConfig.dedicatoriaX ?? parsedConfig.dedicatoryX ?? parsedConfig.dedicatoria?.x ?? 540,
-                                    y: Number(parsedConfig.dedicatoriaY ?? parsedConfig.dedicatoryY ?? parsedConfig.dedicatoria?.y ?? 1620),
-                                    fontSize: Number(dedSize)
-                                  }
-                                };
-                                setRegenerateTemplateConfig(newConfig);
-                              } else {
-                            setRegenerateTemplateConfig({ ...DEFAULT_TEMPLATE, id: '' });
-                            setRegenerateDedicatoriaSize(28);
-                          }
-                          handleRegenerateModalOpenChange(true);
-                        }}
+                            let parsedConfig: any = null;
+                            if (job.config) {
+                              try {
+                                parsedConfig = typeof job.config === 'string' ? JSON.parse(job.config) : job.config;
+                                if (typeof parsedConfig === 'string') parsedConfig = JSON.parse(parsedConfig);
+                              } catch(e) { console.error(e); }
+                            }
+
+                            const bg = job.backgroundUrl || parsedConfig?.backgroundUrl || parsedConfig?.bgUrl || '';
+                            const photo = job.userPhotoUrl || job.imageUrl || parsedConfig?.photoUrl || parsedConfig?.userPhotoUrl || '';
+                            const tit = job.titulo || parsedConfig?.tituloText || parsedConfig?.titulo || '';
+                            const art = job.artista || parsedConfig?.artistaText || parsedConfig?.artista || '';
+                            const ded = job.dedicatoria || parsedConfig?.dedicatoriaText || parsedConfig?.dedicatoria || '';
+
+                            setRegenerateBgUrl(bg);
+                            setRegenerateCustomBg(bg);
+                            setRegenerateUserPhotoUrl(photo);
+                            setRegenerateTitulo(tit);
+                            setRegenerateArtista(art);
+                            setRegenerateDedicatoria(ded);
+
+                            if (parsedConfig) {
+                              const dedSize = parsedConfig.dedicatoriaSize ?? parsedConfig.dedicatorySize ?? parsedConfig.dedicatoria?.fontSize ?? 30;
+                              setRegenerateDedicatoriaSize(Number(dedSize));
+
+                              const pFrame = parsedConfig.photoFrame ?? parsedConfig.photo?.frame ?? true;
+
+                              const tX = parsedConfig.tituloX ?? parsedConfig.titulo?.x ?? 130;
+                              const tY = parsedConfig.tituloY ?? parsedConfig.titulo?.y ?? 1040;
+                              const tSize = parsedConfig.tituloSize ?? parsedConfig.titulo?.fontSize ?? 44;
+                              const tColor = parsedConfig.tituloColor ?? parsedConfig.titulo?.color ?? 'white';
+                              const tAlign = parsedConfig.tituloAlign ?? parsedConfig.titulo?.align ?? 'left';
+                              const tVis = parsedConfig.tituloVisible ?? parsedConfig.titulo?.visible ?? true;
+
+                              const aX = parsedConfig.artistaX ?? parsedConfig.artista?.x ?? 130;
+                              const aY = parsedConfig.artistaY ?? parsedConfig.artista?.y ?? 1100;
+                              const aSize = parsedConfig.artistaSize ?? parsedConfig.artista?.fontSize ?? 32;
+                              const aColor = parsedConfig.artistaColor ?? parsedConfig.artista?.color ?? '#B3B3B3';
+                              const aAlign = parsedConfig.artistaAlign ?? parsedConfig.artista?.align ?? 'left';
+                              const aVis = parsedConfig.artistaVisible ?? parsedConfig.artista?.visible ?? true;
+
+                              const dX = parsedConfig.dedicatoriaX ?? parsedConfig.dedicatoryX ?? parsedConfig.dedicatoria?.x ?? 540;
+                              const dY = parsedConfig.dedicatoriaY ?? parsedConfig.dedicatoryY ?? parsedConfig.dedicatoria?.y ?? 1620;
+                              const dColor = parsedConfig.dedicatoriaColor ?? parsedConfig.dedicatoria?.color ?? '#E5E5E5';
+                              const dAlign = parsedConfig.dedicatoriaAlign ?? parsedConfig.dedicatoria?.align ?? 'center';
+                              const dVis = parsedConfig.dedicatoriaVisible ?? parsedConfig.dedicatoria?.visible ?? true;
+
+                              const vis = parsedConfig.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' };
+
+                              const newConfig: TemplateConfig = {
+                                ...DEFAULT_TEMPLATE,
+                                id: parsedConfig.id || '',
+                                name: parsedConfig.name || 'Plantilla Cliente',
+                                bgUrl: bg,
+                                photo: {
+                                  x: Number(parsedConfig.photoX ?? parsedConfig.photo?.x ?? 130),
+                                  y: Number(parsedConfig.photoY ?? parsedConfig.photo?.y ?? 180),
+                                  w: Number(parsedConfig.photoWidth ?? parsedConfig.photo?.w ?? 820),
+                                  h: Number(parsedConfig.photoHeight ?? parsedConfig.photo?.h ?? 820),
+                                  frame: pFrame !== false
+                                },
+                                titulo: {
+                                  x: tX,
+                                  y: Number(tY),
+                                  fontSize: Number(tSize),
+                                  color: tColor,
+                                  align: tAlign,
+                                  visible: tVis !== false
+                                },
+                                artista: {
+                                  x: aX,
+                                  y: Number(aY),
+                                  fontSize: Number(aSize),
+                                  color: aColor,
+                                  align: aAlign,
+                                  visible: aVis !== false
+                                },
+                                dedicatoria: {
+                                  x: dX,
+                                  y: Number(dY),
+                                  fontSize: Number(dedSize),
+                                  color: dColor,
+                                  align: dAlign,
+                                  visible: dVis !== false
+                                },
+                                visualizer: vis
+                              };
+                              setRegenerateTemplateConfig(newConfig);
+                            } else {
+                              setRegenerateTemplateConfig({ ...DEFAULT_TEMPLATE, id: '' });
+                              setRegenerateDedicatoriaSize(30);
+                            }
+                            handleRegenerateModalOpenChange(true);
+                          }}
                         className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-all shadow-sm border border-transparent hover:border-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Configurar y Generar Video"
                       >

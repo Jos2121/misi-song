@@ -229,15 +229,35 @@ async function processJob(job: any) {
 
     // Download user photo
     if (finalPhotoUrl) {
-      const isLocalPath = finalPhotoUrl.startsWith('/media/');
-      if (isLocalPath) {
-        tempPhotoPath = path.join(mediaDir, path.basename(finalPhotoUrl));
-      } else if (finalPhotoUrl.startsWith('http')) {
-        const imageRes = await fetchWithTimeout(finalPhotoUrl, {}, 20000);
-        if (imageRes.ok) {
-          downloadedTempPhoto = path.join(mediaDir, `temp_photo_${Date.now()}.jpg`);
-          fs.writeFileSync(downloadedTempPhoto, Buffer.from(await imageRes.arrayBuffer()));
-          tempPhotoPath = downloadedTempPhoto;
+      if (finalPhotoUrl.startsWith('http')) {
+        try {
+          const imageRes = await fetchWithTimeout(finalPhotoUrl, {}, 20000);
+          if (imageRes.ok) {
+            downloadedTempPhoto = path.join(mediaDir, `temp_photo_${Date.now()}.jpg`);
+            fs.writeFileSync(downloadedTempPhoto, Buffer.from(await imageRes.arrayBuffer()));
+            tempPhotoPath = downloadedTempPhoto;
+          }
+        } catch (err) {
+          console.warn("Error descargando foto en retry:", err);
+        }
+      }
+
+      if (!tempPhotoPath) {
+        const cleanImgName = path.basename(finalPhotoUrl.split('?')[0].split('#')[0]);
+        const candidates = [
+          path.join(mediaDir, cleanImgName),
+          path.resolve(process.cwd(), "public", finalPhotoUrl.replace(/^\//, '')),
+          path.resolve(process.cwd(), "public/media", cleanImgName),
+          path.resolve(process.cwd(), "public/images", cleanImgName),
+          path.resolve(process.cwd(), "public", cleanImgName),
+          path.resolve(process.cwd(), "public/images/hero-cover.png")
+        ];
+        const found = candidates.find(p => fs.existsSync(p));
+        if (found) {
+          tempPhotoPath = found;
+        } else {
+          const fallback = path.resolve(process.cwd(), "public/images/hero-cover.png");
+          if (fs.existsSync(fallback)) tempPhotoPath = fallback;
         }
       }
     }
