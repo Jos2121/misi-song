@@ -222,6 +222,7 @@ async function processJob(job: any) {
   let tempPhotoPath = "";
   let downloadedTempPhoto = "";
   let tempBgPath = "";
+  let tempDedPath = "";
 
   try {
     const finalPhotoUrl = userPhotoUrl;
@@ -301,7 +302,12 @@ async function processJob(job: any) {
 
     const sanitize = (str: string) => {
       if (!str) return "";
-      return str.replace(/:/g, "\\:").replace(/'/g, "\u2019").replace(/"/g, "\u201D").replace(/[\n\r]/g, " ");
+      return str
+        .replace(/\\/g, "")
+        .replace(/:/g, "\\:")
+        .replace(/'/g, "\u2019")
+        .replace(/"/g, "\u201D")
+        .replace(/[\n\r]/g, " ");
     };
     
     const wrapText = (str: string, maxCharsPerLine = 34) => {
@@ -318,7 +324,7 @@ async function processJob(job: any) {
         }
       }
       if (currentLine) lines.push(currentLine);
-      return lines.join("\n");
+      return lines.join("\\n");
     };
 
     const safeTitulo = sanitize(titulo);
@@ -326,16 +332,21 @@ async function processJob(job: any) {
     const escapedDedicatoria = wrapText(sanitize(dedicatoria));
 
     const t = config || {
-      photo: { x: 130, y: 180, w: 820, h: 820 },
-      titulo: { x: 130, y: 1040, fontSize: 42, color: 'white', align: 'left' },
-      artista: { x: 130, y: 1095, fontSize: 30, color: '#B3B3B3', align: 'left' },
-      dedicatoria: { x: 'center', y: 1620, fontSize: 28, color: '#E5E5E5', align: 'center' }
+      photo: { x: 130, y: 180, w: 820, h: 820, frame: true },
+      titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true },
+      artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true },
+      dedicatoria: { x: 'center', y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true }
     };
 
-    const dedicatoriaX = t.dedicatoria?.x !== 'center' ? Number(t.dedicatoria?.x) : 540;
+    const sanitizeColor = (col?: string, defaultCol = 'white') => {
+      if (!col) return defaultCol;
+      return col.startsWith('#') ? col.replace('#', '0x') : col;
+    };
+
+    const dedicatoriaX = t.dedicatoria?.x !== 'center' ? (Number(t.dedicatoria?.x) || 540) : 540;
     const dedicatoriaY = Number(t.dedicatoria?.y) || 1620;
-    const dedicatoriaSize = Number(t.dedicatoria?.fontSize) || 28;
-    const dedicatoriaColor = t.dedicatoria?.color || 'white';
+    const dedicatoriaSize = Number(t.dedicatoria?.fontSize) || 30;
+    const dedicatoriaColor = sanitizeColor(t.dedicatoria?.color, '0xE5E5E5');
 
     const photoW = Number(t.photo?.w) || 820;
     const photoH = Number(t.photo?.h) || 820;
@@ -352,8 +363,8 @@ async function processJob(job: any) {
     
     if (tempPhotoPath) {
       if (hasPolaroidFrame) {
-        const padX = Math.round(photoW * 0.045);
-        const padTop = Math.round(photoH * 0.045);
+        const padX = Math.round(photoW * 0.04);
+        const padTop = Math.round(photoH * 0.04);
         const padBottom = Math.round(photoH * 0.17);
         const innerW = photoW - (padX * 2);
         const innerH = photoH - padTop - padBottom;
@@ -379,8 +390,7 @@ async function processJob(job: any) {
       const visH = Number(vis.h) || 70;
       const visX = vis.x === 'center' ? '(1080-w)/2' : (Number(vis.x) || 130);
       const visY = Number(vis.y) || 1180;
-      const rawColor = vis.color || 'white';
-      const visColor = rawColor.startsWith('#') ? rawColor.replace('#', '0x') : rawColor;
+      const visColor = sanitizeColor(vis.color, 'white');
 
       filter += `;[2:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.1:0.1,format=yuva420p[wave]`;
       filter += `;[${lastV}][wave]overlay=x=${visX}:y=${visY}[v${vIndex}]`;
@@ -388,31 +398,47 @@ async function processJob(job: any) {
       vIndex++;
     }
     
-    const fontFileOnDisk = path.resolve(process.cwd(), "public/fonts/cursive.ttf");
+    const fontFileRelative = "public/fonts/cursive.ttf";
+    const fontFileOnDisk = path.resolve(process.cwd(), fontFileRelative);
     const fontParam = fs.existsSync(fontFileOnDisk)
-      ? `:fontfile='${fontFileOnDisk.replace(/\\/g, "/").replace(/:/g, "\\:")}'`
+      ? `:fontfile='${fontFileRelative}'`
       : `:font='Segoe Script'`;
 
     if (t.titulo?.visible !== false && safeTitulo) {
-      const align = t.titulo.align || 'left';
-      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-130' : (t.titulo.x || 130));
-      filter += `;[${lastV}]drawtext=text='${safeTitulo}'${fontParam}:fontcolor=${t.titulo.color}:fontsize=${t.titulo.fontSize}:x=${xPos}:y=${t.titulo.y}[v${vIndex}]`;
+      const align = t.titulo?.align || 'left';
+      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-86' : (t.titulo?.x || 130));
+      const col = sanitizeColor(t.titulo?.color, 'white');
+      const sz = Number(t.titulo?.fontSize) || 44;
+      const yPos = Number(t.titulo?.y) || 1040;
+      filter += `;[${lastV}]drawtext=text='${safeTitulo}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     }
     
     if (t.artista?.visible !== false && safeArtista) {
-      const align = t.artista.align || 'left';
-      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-130' : (t.artista.x || 130));
-      filter += `;[${lastV}]drawtext=text='${safeArtista}'${fontParam}:fontcolor=${t.artista.color}:fontsize=${t.artista.fontSize}:x=${xPos}:y=${t.artista.y}[v${vIndex}]`;
+      const align = t.artista?.align || 'left';
+      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-86' : (t.artista?.x || 130));
+      const col = sanitizeColor(t.artista?.color, '0xB3B3B3');
+      const sz = Number(t.artista?.fontSize) || 32;
+      const yPos = Number(t.artista?.y) || 1100;
+      filter += `;[${lastV}]drawtext=text='${safeArtista}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     }
     
     if (t.dedicatoria?.visible !== false && escapedDedicatoria) {
-      const align = t.dedicatoria.align || 'center';
-      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-130' : (t.dedicatoria.x || 130));
-      filter += `;[${lastV}]drawtext=text='${escapedDedicatoria}'${fontParam}:fontcolor=${dedicatoriaColor}:fontsize=${dedicatoriaSize}:x=${xPos}:y=${dedicatoriaY}:line_spacing=${Math.round(dedicatoriaSize * 0.4)}[v${vIndex}]`;
+      const align = t.dedicatoria?.align || 'center';
+      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-86' : (t.dedicatoria?.x || 130));
+      const col = sanitizeColor(t.dedicatoria?.color || dedicatoriaColor, '0xE5E5E5');
+      const sz = Number(t.dedicatoria?.fontSize) || dedicatoriaSize || 30;
+      const yCoord = Number(t.dedicatoria?.y) || dedicatoriaY || 1620;
+
+      const tempDedFileName = `temp_ded_${Date.now()}.txt`;
+      tempDedPath = path.join(mediaDir, tempDedFileName);
+      fs.writeFileSync(tempDedPath, escapedDedicatoria.replace(/\\n/g, "\n"), "utf8");
+      const relDedPath = `public/media/${tempDedFileName}`;
+
+      filter += `;[${lastV}]drawtext=textfile='${relDedPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yCoord}:line_spacing=${Math.round(sz * 0.4)}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     }
@@ -436,6 +462,9 @@ async function processJob(job: any) {
     }
     if (tempBgPath && tempBgPath.includes('temp_bg_') && fs.existsSync(tempBgPath)) {
       fs.unlinkSync(tempBgPath);
+    }
+    if (tempDedPath && fs.existsSync(tempDedPath)) {
+      fs.unlinkSync(tempDedPath);
     }
   }
 }
