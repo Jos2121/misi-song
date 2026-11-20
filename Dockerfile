@@ -17,6 +17,7 @@ WORKDIR /usr/src/app
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=512"
 COPY --from=build /usr/src/app/.output ./.output
+COPY --from=build /usr/src/app/public ./public
 COPY --from=build /usr/src/app/package.json ./package.json
 
 EXPOSE 3000

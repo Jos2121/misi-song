@@ -4,6 +4,7 @@ import { pool } from "../../../utils/db";
 import { runFfmpeg, getFfmpegThreads, fetchWithTimeout } from "../../../utils/ffmpegQueue";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 export default defineHandler(async (event) => {
   const body = await readBody(event);
@@ -222,6 +223,8 @@ async function processJob(job: any) {
   let tempPhotoPath = "";
   let downloadedTempPhoto = "";
   let tempBgPath = "";
+  let tempTitlePath = "";
+  let tempArtistPath = "";
   let tempDedPath = "";
 
   try {
@@ -398,14 +401,40 @@ async function processJob(job: any) {
       vIndex++;
     }
     
+    let currentDir = "";
+    try {
+      currentDir = path.dirname(fileURLToPath(import.meta.url));
+    } catch (e) {
+      currentDir = process.cwd();
+    }
+
     const fontCandidates = [
+      path.join(mediaDir, "font_cursive.ttf"),
+      path.resolve(currentDir, "../../../../public/fonts/cursive.ttf"),
+      path.resolve(currentDir, "../../../public/fonts/cursive.ttf"),
+      path.resolve(currentDir, "../../public/fonts/cursive.ttf"),
+      path.resolve(currentDir, "../public/fonts/cursive.ttf"),
+      path.resolve(currentDir, "./public/fonts/cursive.ttf"),
       path.resolve(process.cwd(), "public/fonts/cursive.ttf"),
       path.resolve(process.cwd(), "App Cursea/public/fonts/cursive.ttf"),
+      path.resolve(process.cwd(), ".output/public/fonts/cursive.ttf"),
+      path.resolve(process.cwd(), "App Cursea/.output/public/fonts/cursive.ttf"),
       "C:/Windows/Fonts/segoesc.ttf",
       "C:/Windows/Fonts/segoepr.ttf"
     ];
     const resolvedFont = fontCandidates.find(f => fs.existsSync(f)) || "C:/Windows/Fonts/segoesc.ttf";
-    const escapedFontPath = resolvedFont.replace(/\\/g, '/').replace(':', '\\:');
+
+    const guaranteedFontPath = path.join(mediaDir, "font_cursive.ttf");
+    if (!fs.existsSync(guaranteedFontPath) && fs.existsSync(resolvedFont)) {
+      try {
+        fs.copyFileSync(resolvedFont, guaranteedFontPath);
+      } catch (e) {
+        console.warn("No se pudo copiar font a mediaDir:", e);
+      }
+    }
+
+    const finalFontFile = fs.existsSync(guaranteedFontPath) ? guaranteedFontPath : resolvedFont;
+    const escapedFontPath = finalFontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
     const fontParam = `:fontfile='${escapedFontPath}'`;
 
     if (t.titulo?.visible !== false && safeTitulo) {
@@ -414,7 +443,13 @@ async function processJob(job: any) {
       const col = sanitizeColor(t.titulo?.color, 'white');
       const sz = Number(t.titulo?.fontSize) || 44;
       const yPos = Number(t.titulo?.y) || 1040;
-      filter += `;[${lastV}]drawtext=text='${safeTitulo}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
+
+      const tempTitleFileName = `temp_tit_${Date.now()}.txt`;
+      tempTitlePath = path.join(mediaDir, tempTitleFileName);
+      fs.writeFileSync(tempTitlePath, safeTitulo, "utf8");
+      const escapedTitlePath = tempTitlePath.replace(/\\/g, '/').replace(/:/g, '\\:');
+
+      filter += `;[${lastV}]drawtext=textfile='${escapedTitlePath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     }
@@ -425,7 +460,13 @@ async function processJob(job: any) {
       const col = sanitizeColor(t.artista?.color, '0xB3B3B3');
       const sz = Number(t.artista?.fontSize) || 32;
       const yPos = Number(t.artista?.y) || 1100;
-      filter += `;[${lastV}]drawtext=text='${safeArtista}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
+
+      const tempArtistFileName = `temp_art_${Date.now()}.txt`;
+      tempArtistPath = path.join(mediaDir, tempArtistFileName);
+      fs.writeFileSync(tempArtistPath, safeArtista, "utf8");
+      const escapedArtistPath = tempArtistPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+
+      filter += `;[${lastV}]drawtext=textfile='${escapedArtistPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     }
@@ -466,6 +507,12 @@ async function processJob(job: any) {
     }
     if (tempBgPath && tempBgPath.includes('temp_bg_') && fs.existsSync(tempBgPath)) {
       fs.unlinkSync(tempBgPath);
+    }
+    if (tempTitlePath && fs.existsSync(tempTitlePath)) {
+      fs.unlinkSync(tempTitlePath);
+    }
+    if (tempArtistPath && fs.existsSync(tempArtistPath)) {
+      fs.unlinkSync(tempArtistPath);
     }
     if (tempDedPath && fs.existsSync(tempDedPath)) {
       fs.unlinkSync(tempDedPath);

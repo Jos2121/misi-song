@@ -132,7 +132,7 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
 
     return (
       <div
-        className="absolute whitespace-pre-wrap break-words drop-shadow-md font-cursive italic tracking-wide select-none"
+        className="absolute whitespace-pre-wrap break-words drop-shadow-md font-cursive tracking-wide select-none"
         style={styleObj}
       >
         {text || placeholder}
