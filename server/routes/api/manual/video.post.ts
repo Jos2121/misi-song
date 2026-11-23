@@ -425,7 +425,13 @@ export default defineHandler(async (event) => {
       const lineSpacing = Math.round(opts.fontSize * 0.25);
       const alignFlag = opts.align === 'center' ? 'C' : (opts.align === 'right' ? 'R' : 'L');
       const pos = opts.align === 'center' ? '(w-text_w)/2' : (opts.align === 'right' ? 'w-text_w-86' : `${opts.rawX}`);
+      
+      // Ajuste de altura de texto idéntico a line-height 1.25 de CSS
+      const lineCount = Math.max(1, opts.formattedText.split('\n').length);
+      const lineHeightPx = Math.round(opts.fontSize * 1.25);
+      const boxH = Math.max(lineHeightPx, lineCount * lineHeightPx);
 
+      // Si no tiene ángulo, dibuja directo en la coordenada Y exacta
       if (!opts.angle || opts.angle === 0) {
         staticFilter += `;[${lastV}]drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${pos}:y=${opts.y}:text_align=${alignFlag}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
         lastV = `v${vIndex}`;
@@ -433,11 +439,8 @@ export default defineHandler(async (event) => {
         return;
       }
 
-      // Si tiene ángulo, se genera en su caja y se rota según el pivote exacto
+      // Si tiene ángulo, la caja tiene la altura justa del texto en CSS y el texto empieza en y=0
       const boxW = opts.align === 'left' ? Math.max(300, 993 - opts.rawX) : 907;
-      const lineCount = Math.max(1, opts.formattedText.split('\n').length);
-      const approxTextH = Math.max(opts.fontSize * 1.4, lineCount * Math.round(opts.fontSize * 1.3));
-      const boxH = Math.round(approxTextH + opts.fontSize * 1.0);
       const inBoxX = opts.align === 'center' ? '(w-text_w)/2' : (opts.align === 'right' ? 'w-text_w' : '0');
       const rad = (opts.angle * Math.PI) / 180;
 
@@ -454,7 +457,8 @@ export default defineHandler(async (event) => {
         overlayPos = `x='${1080 - 86} - ${offsetX} - w/2':y='${Math.round(opts.y + boxH / 2)} - ${offsetY} - h/2'`;
       }
 
-      staticFilter += `;color=c=black@0.0:s=${boxW}x${boxH},format=rgba,drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${inBoxX}:y=(h-text_h)/2:text_align=${alignFlag}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[box_${opts.key}];[box_${opts.key}]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[rot_${opts.key}];[${lastV}][rot_${opts.key}]overlay=${overlayPos}[v${vIndex}]`;
+      // y=0 dentro de la caja asegura que no haya desfase hacia abajo
+      staticFilter += `;color=c=black@0.0:s=${boxW}x${boxH},format=rgba,drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${inBoxX}:y=0:text_align=${alignFlag}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[box_${opts.key}];[box_${opts.key}]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[rot_${opts.key}];[${lastV}][rot_${opts.key}]overlay=${overlayPos}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     };
@@ -537,9 +541,9 @@ export default defineHandler(async (event) => {
 
     if (!isVideoBg) {
       // Caso 1: Fondo es imagen estática (o color)
-      // Visualizador moderno: pasabajos para eliminar ruido caótico + compand musical + draw=full para color 100% puro
+      // Visualizador moderno de barras musicales centradas, nítidas, fluidas y con respeto 100% al color
       if (isVisEnabled) {
-        const waveFilter = `[1:a]aformat=channel_layouts=mono,lowpass=f=2200,compand=attacks=0.02:decays=0.15:points=-80/-80|-40/-18|-20/-4|0/-1,showwaves=s=${visW}x${visH}:mode=cline:scale=sqrt:draw=full:colors='${cleanVisColor}',colorkey=0x000000:0.02:0.01,format=yuva420p[wave];[0:v][wave]overlay=x=${visX}:y=${visY}:shortest=1[v_out]`;
+        const waveFilter = `[1:a]aformat=channel_layouts=mono,lowpass=f=2000,compand=attacks=0.02:decays=0.15:points=-80/-80|-40/-18|-20/-4|0/-1,showwaves=s=48x${visH}:mode=cline:scale=sqrt:draw=full:colors='${cleanVisColor}',scale=${visW}:${visH}:flags=neighbor,colorkey=0x000000:0.02:0.01,format=yuva420p[wave];[0:v][wave]overlay=x=${visX}:y=${visY}:shortest=1[v_out]`;
         ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${waveFilter}" -map "[v_out]" -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       } else {
         ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
@@ -550,7 +554,7 @@ export default defineHandler(async (event) => {
       let finalV = 'v_comp';
 
       if (isVisEnabled) {
-        videoFilter += `;[2:a]aformat=channel_layouts=mono,lowpass=f=2200,compand=attacks=0.02:decays=0.15:points=-80/-80|-40/-18|-20/-4|0/-1,showwaves=s=${visW}x${visH}:mode=cline:scale=sqrt:draw=full:colors='${cleanVisColor}',colorkey=0x000000:0.02:0.01,format=yuva420p[wave];[v_comp][wave]overlay=x=${visX}:y=${visY}[v_out]`;
+        videoFilter += `;[2:a]aformat=channel_layouts=mono,lowpass=f=2000,compand=attacks=0.02:decays=0.15:points=-80/-80|-40/-18|-20/-4|0/-1,showwaves=s=48x${visH}:mode=cline:scale=sqrt:draw=full:colors='${cleanVisColor}',scale=${visW}:${visH}:flags=neighbor,colorkey=0x000000:0.02:0.01,format=yuva420p[wave];[v_comp][wave]overlay=x=${visX}:y=${visY}[v_out]`;
         finalV = 'v_out';
       }
 
