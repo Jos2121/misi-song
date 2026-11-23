@@ -1,5 +1,5 @@
 import { defineHandler } from "nitro";
-import { getRouterParam, getRequestHeader, createError, setHeader, setResponseStatus, sendStream } from "nitro/h3";
+import { getRouterParam, getRequestHeader, getQuery, createError, setHeader, setResponseStatus, sendStream } from "nitro/h3";
 import fs from "fs";
 import path from "path";
 
@@ -35,6 +35,16 @@ export default defineHandler(async (event) => {
   setHeader(event, "Content-Type", contentType);
   setHeader(event, "Accept-Ranges", "bytes");
   setHeader(event, "Cache-Control", "public, max-age=86400");
+
+  const query = getQuery(event);
+  if (query.download === "1" || query.download === "true") {
+    const downloadFilename = (query.filename as string) || safeFile;
+    setHeader(
+      event,
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(downloadFilename)}"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`
+    );
+  }
 
   const rangeHeader = getRequestHeader(event, "range");
   if (rangeHeader && fileSize > 0) {

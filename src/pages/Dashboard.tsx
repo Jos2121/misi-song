@@ -575,8 +575,30 @@ export default function Dashboard() {
   };
 
   const handleDownload = async (url: string, filename: string) => {
-    const toastId = toast.loading('Descargando archivo...');
+    const toastId = toast.loading('Iniciando descarga...');
     try {
+      if (!url) throw new Error('URL de archivo no válida');
+
+      // Si es una URL interna de medios (/media/...), usamos descarga nativa directa por streaming
+      if (url.startsWith('/media/')) {
+        const checkRes = await fetch(url, { method: 'HEAD' }).catch(() => null);
+        if (checkRes && !checkRes.ok && checkRes.status !== 405) {
+          throw new Error('El archivo no está disponible en el servidor');
+        }
+
+        const downloadUrl = `${url}${url.includes('?') ? '&' : '?'}download=1&filename=${encodeURIComponent(filename)}`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast.success('Descarga iniciada', { id: toastId });
+        return;
+      }
+
+      // Para URLs externas o blobs, fallback a descarga por blob
       const response = await fetch(url);
       if (!response.ok) throw new Error('Error al descargar');
       const contentType = response.headers.get('content-type') || '';

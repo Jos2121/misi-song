@@ -127,7 +127,6 @@ async function processJob(job: any) {
   }
 
   // 2. GENERATE AUDIO via OpenRouter (Lyria)
-  // Utilizamos el prompt maestro si existe, si no, uno simple
   const lyriaPrompt = prompt || `Una canción titulada "${titulo || 'Sin Título'}" por ${artista || 'Artista Desconocido'} con la dedicatoria: ${dedicatoria || ''}`;
   
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -219,13 +218,15 @@ async function processJob(job: any) {
     [relativeAudioUrl, jobId]
   );
 
-  // 3. GENERATE VIDEO via FFmpeg
+  // 3. GENERATE VIDEO via FFmpeg (Fase 1: Pre-composición estática + Fase 2: Video rápido)
   let tempPhotoPath = "";
   let downloadedTempPhoto = "";
   let tempBgPath = "";
   let tempTitlePath = "";
   let tempArtistPath = "";
   let tempDedPath = "";
+  let tempComposedPath = "";
+  let tempOverlayPath = "";
 
   try {
     const finalPhotoUrl = userPhotoUrl;
@@ -283,7 +284,7 @@ async function processJob(job: any) {
           const ctype = (bgRes.headers.get('content-type') || '').toLowerCase();
           bgExt = ctype.includes('video') ? '.mp4' : '.jpg';
         }
-        tempBgPath = path.join(mediaDir, `temp_bg_${Date.now()}${bgExt}`);
+        tempBgPath = path.join(mediaDir, `temp_bg_${Date.now}${bgExt}`);
         fs.writeFileSync(tempBgPath, Buffer.from(await bgRes.arrayBuffer()));
       }
     } else if (fs.existsSync(resolvedBgPath)) {
@@ -300,45 +301,56 @@ async function processJob(job: any) {
       )
     );
 
-    const videoFileName = `video_${Date.now()}.mp4`;
-    const videoPath = path.join(mediaDir, videoFileName);
-
-    const sanitize = (str: string) => {
+    const sanitizeText = (str: string) => {
       if (!str) return "";
       return str
-        .replace(/\\/g, "")
         .replace(/:/g, "\\:")
         .replace(/'/g, "\u2019")
-        .replace(/"/g, "\u201D")
-        .replace(/[\n\r]/g, " ");
+        .replace(/"/g, "\u201D");
     };
-    
-    const wrapText = (str: string, maxCharsPerLine = 34) => {
+
+    const wrapTextForPreview = (str: string, fontSize: number, availableWidthPx: number = 860) => {
       if (!str) return "";
-      const words = str.trim().split(/\s+/);
-      const lines: string[] = [];
-      let currentLine = "";
-      for (const word of words) {
-        if ((currentLine + " " + word).trim().length <= maxCharsPerLine) {
-          currentLine = (currentLine + " " + word).trim();
-        } else {
-          if (currentLine) lines.push(currentLine);
-          currentLine = word;
+      const avgCharWidth = Math.max(12, fontSize * 0.52);
+      const maxCharsPerLine = Math.max(16, Math.floor(availableWidthPx / avgCharWidth));
+
+      const lines = str.split(/\r\n|\r|\n/);
+      const finalLines: string[] = [];
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          finalLines.push("");
+          continue;
+        }
+
+        const words = trimmed.split(/\s+/);
+        let currentLine = "";
+
+        for (const word of words) {
+          if (!currentLine) {
+            currentLine = word;
+          } else if ((currentLine + " " + word).length <= maxCharsPerLine) {
+            currentLine += " " + word;
+          } else {
+            finalLines.push(currentLine);
+            currentLine = word;
+          }
+        }
+        if (currentLine) {
+          finalLines.push(currentLine);
         }
       }
-      if (currentLine) lines.push(currentLine);
-      return lines.join("\\n");
+
+      return finalLines.join("\n");
     };
 
-    const safeTitulo = sanitize(titulo);
-    const safeArtista = sanitize(artista);
-    const escapedDedicatoria = wrapText(sanitize(dedicatoria));
-
     const t = config || {
-      photo: { x: 130, y: 180, w: 820, h: 820, frame: true },
-      titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true },
-      artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true },
-      dedicatoria: { x: 'center', y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true }
+      photo: { x: 130, y: 180, w: 820, h: 820, frame: true, angle: -3 },
+      titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true, angle: 0 },
+      artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true, angle: 0 },
+      dedicatoria: { x: 540, y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true, angle: 0 },
+      visualizer: { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' }
     };
 
     const sanitizeColor = (col?: string, defaultCol = 'white') => {
@@ -346,61 +358,6 @@ async function processJob(job: any) {
       return col.startsWith('#') ? col.replace('#', '0x') : col;
     };
 
-    const dedicatoriaX = t.dedicatoria?.x !== 'center' ? (Number(t.dedicatoria?.x) || 540) : 540;
-    const dedicatoriaY = Number(t.dedicatoria?.y) || 1620;
-    const dedicatoriaSize = Number(t.dedicatoria?.fontSize) || 30;
-    const dedicatoriaColor = sanitizeColor(t.dedicatoria?.color, '0xE5E5E5');
-
-    const photoW = Number(t.photo?.w) || 820;
-    const photoH = Number(t.photo?.h) || 820;
-    const photoX = Number(t.photo?.x) || 130;
-    const photoY = Number(t.photo?.y) || 180;
-
-    const hasPolaroidFrame = t.photo?.frame !== false;
-
-    const bgInput = tempBgPath
-      ? (isVideoBg ? `-stream_loop -1 -i "${tempBgPath}"` : `-loop 1 -framerate 1 -i "${tempBgPath}"`)
-      : `-f lavfi -i color=c=black:s=1080x1920:r=1`;
-
-    let filter = `[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg_base];`;
-    
-    if (tempPhotoPath) {
-      if (hasPolaroidFrame) {
-        const padX = Math.round(photoW * 0.04);
-        const padTop = Math.round(photoH * 0.04);
-        const padBottom = Math.round(photoH * 0.17);
-        const innerW = photoW - (padX * 2);
-        const innerH = photoH - padTop - padBottom;
-
-        filter += `color=c=white:s=${photoW}x${photoH}:d=1,fps=25[polaroid_card];`;
-        filter += `[0:v]scale=w=${innerW}:h=${innerH}:force_original_aspect_ratio=increase,crop=${innerW}:${innerH}:(in_w-${innerW})/2:(in_h-${innerH})/2,fps=25[inner_photo];`;
-        filter += `[polaroid_card][inner_photo]overlay=x=${padX}:y=${padTop}[photo];`;
-      } else {
-        filter += `[0:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2,fps=25[photo];`;
-      }
-      filter += `[bg_base][photo]overlay=x=${photoX}:y=${photoY}[v1]`;
-    } else {
-      filter += `[bg_base]copy[v1]`;
-    }
-
-    let lastV = 'v1';
-    let vIndex = 2;
-
-    // Visualización musical sincronizada (showwaves)
-    const vis = t.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: 'white' };
-    if (vis.enabled !== false) {
-      const visW = Number(vis.w) || 820;
-      const visH = Number(vis.h) || 70;
-      const visX = vis.x === 'center' ? '(1080-w)/2' : (Number(vis.x) || 130);
-      const visY = Number(vis.y) || 1180;
-      const visColor = sanitizeColor(vis.color, 'white');
-
-      filter += `;[2:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.1:0.1,format=yuva420p[wave]`;
-      filter += `;[${lastV}][wave]overlay=x=${visX}:y=${visY}[v${vIndex}]`;
-      lastV = `v${vIndex}`;
-      vIndex++;
-    }
-    
     let currentDir = "";
     try {
       currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -437,61 +394,186 @@ async function processJob(job: any) {
     const escapedFontPath = finalFontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
     const fontParam = `:fontfile='${escapedFontPath}'`;
 
-    if (t.titulo?.visible !== false && safeTitulo) {
-      const align = t.titulo?.align || 'left';
-      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-86' : (t.titulo?.x || 130));
-      const col = sanitizeColor(t.titulo?.color, 'white');
-      const sz = Number(t.titulo?.fontSize) || 44;
-      const yPos = Number(t.titulo?.y) || 1040;
+    // Procesar Textos
+    const isTituloVisible = t.titulo?.visible !== false && Boolean(titulo);
+    const tituloAlign = t.titulo?.align || 'left';
+    const tituloRawX = t.titulo?.x === 'center' || !t.titulo?.x ? 130 : Number(t.titulo.x);
+    const tituloAvailableW = tituloAlign === 'center' ? 907 : Math.max(400, 993 - (tituloAlign === 'right' ? 86 : tituloRawX));
+    const tituloSz = Number(t.titulo?.fontSize) || 44;
+    const tituloY = Number(t.titulo?.y) || 1040;
+    const tituloColor = sanitizeColor(t.titulo?.color, 'white');
+    const tituloPos = tituloAlign === 'center' ? '(w-text_w)/2' : (tituloAlign === 'right' ? 'w-text_w-86' : `${tituloRawX}`);
+    const tituloAlignFlag = tituloAlign === 'center' ? 'C' : (tituloAlign === 'right' ? 'R' : 'L');
+    const tituloLineSpacing = Math.round(tituloSz * 0.25);
 
-      const tempTitleFileName = `temp_tit_${Date.now()}.txt`;
-      tempTitlePath = path.join(mediaDir, tempTitleFileName);
-      fs.writeFileSync(tempTitlePath, safeTitulo, "utf8");
+    if (isTituloVisible) {
+      const formattedTitulo = wrapTextForPreview(sanitizeText(titulo), tituloSz, tituloAvailableW);
+      tempTitlePath = path.join(mediaDir, `temp_tit_${Date.now()}.txt`);
+      fs.writeFileSync(tempTitlePath, formattedTitulo, "utf8");
+    }
+
+    const isArtistaVisible = t.artista?.visible !== false && Boolean(artista);
+    const artistaAlign = t.artista?.align || 'left';
+    const artistaRawX = t.artista?.x === 'center' || !t.artista?.x ? 130 : Number(t.artista.x);
+    const artistaAvailableW = artistaAlign === 'center' ? 907 : Math.max(400, 993 - (artistaAlign === 'right' ? 86 : artistaRawX));
+    const artistaSz = Number(t.artista?.fontSize) || 32;
+    const artistaY = Number(t.artista?.y) || 1100;
+    const artistaColor = sanitizeColor(t.artista?.color, '0xB3B3B3');
+    const artistaPos = artistaAlign === 'center' ? '(w-text_w)/2' : (artistaAlign === 'right' ? 'w-text_w-86' : `${artistaRawX}`);
+    const artistaAlignFlag = artistaAlign === 'center' ? 'C' : (artistaAlign === 'right' ? 'R' : 'L');
+    const artistaLineSpacing = Math.round(artistaSz * 0.25);
+
+    if (isArtistaVisible) {
+      const formattedArtista = wrapTextForPreview(sanitizeText(artista), artistaSz, artistaAvailableW);
+      tempArtistPath = path.join(mediaDir, `temp_art_${Date.now()}.txt`);
+      fs.writeFileSync(tempArtistPath, formattedArtista, "utf8");
+    }
+
+    const isDedicatoriaVisible = t.dedicatoria?.visible !== false && Boolean(dedicatoria);
+    const dedicatoriaAlign = t.dedicatoria?.align || 'center';
+    const dedicatoriaRawX = t.dedicatoria?.x === 'center' || !t.dedicatoria?.x ? 130 : Number(t.dedicatoria.x);
+    const dedicatoriaAvailableW = dedicatoriaAlign === 'center' ? 907 : Math.max(400, 993 - (dedicatoriaAlign === 'right' ? 86 : dedicatoriaRawX));
+    const dedicatoriaSz = Number(t.dedicatoria?.fontSize) || 30;
+    const dedicatoriaY = Number(t.dedicatoria?.y) || 1620;
+    const dedicatoriaColor = sanitizeColor(t.dedicatoria?.color, '0xE5E5E5');
+    const dedicatoriaPos = dedicatoriaAlign === 'center' ? '(w-text_w)/2' : (dedicatoriaAlign === 'right' ? 'w-text_w-86' : `${dedicatoriaRawX}`);
+    const dedicatoriaAlignFlag = dedicatoriaAlign === 'center' ? 'C' : (dedicatoriaAlign === 'right' ? 'R' : 'L');
+    const dedicatoriaLineSpacing = Math.round(dedicatoriaSz * 0.25);
+
+    if (isDedicatoriaVisible) {
+      const formattedDedicatoria = wrapTextForPreview(sanitizeText(dedicatoria), dedicatoriaSz, dedicatoriaAvailableW);
+      tempDedPath = path.join(mediaDir, `temp_ded_${Date.now()}.txt`);
+      fs.writeFileSync(tempDedPath, formattedDedicatoria, "utf8");
+    }
+
+    // Parámetros de foto
+    const photoW = Number(t.photo?.w) || 820;
+    const photoH = Number(t.photo?.h) || 820;
+    const photoX = Number(t.photo?.x) || 130;
+    const photoY = Number(t.photo?.y) || 180;
+    const photoAngle = Number(t.photo?.angle !== undefined ? t.photo.angle : -3);
+    const hasPolaroidFrame = t.photo?.frame !== false;
+
+    // FASE 1: PRE-COMPOSICIÓN ESTÁTICA
+    const staticInputs: string[] = [];
+    let photoInputIdx = -1;
+    if (tempPhotoPath) {
+      photoInputIdx = staticInputs.length;
+      staticInputs.push(`-i "${tempPhotoPath}"`);
+    }
+
+    let staticFilter = "";
+    if (!isVideoBg) {
+      if (tempBgPath && fs.existsSync(tempBgPath)) {
+        const bgIdx = staticInputs.length;
+        staticInputs.push(`-i "${tempBgPath}"`);
+        staticFilter += `[${bgIdx}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2[bg_base];`;
+      } else {
+        staticFilter += `color=c=black:s=1080x1920[bg_base];`;
+      }
+    } else {
+      staticFilter += `color=c=black@0.0:s=1080x1920,format=rgba[bg_base];`;
+    }
+
+    let lastV = 'bg_base';
+    let vIndex = 1;
+
+    if (tempPhotoPath && photoInputIdx >= 0) {
+      if (hasPolaroidFrame) {
+        const padX = Math.round(photoW * 0.045);
+        const padTop = Math.round(photoH * 0.045);
+        const padBottom = Math.round(photoH * 0.17);
+        const innerW = photoW - (padX * 2);
+        const innerH = photoH - padTop - padBottom;
+
+        staticFilter += `color=c=white:s=${photoW}x${photoH}[polaroid_card];`;
+        staticFilter += `[${photoInputIdx}:v]scale=w=${innerW}:h=${innerH}:force_original_aspect_ratio=increase,crop=${innerW}:${innerH}:(in_w-${innerW})/2:(in_h-${innerH})/2[inner_photo];`;
+        staticFilter += `[polaroid_card][inner_photo]overlay=x=${padX}:y=${padTop}[photo_raw];`;
+      } else {
+        staticFilter += `[${photoInputIdx}:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2[photo_raw];`;
+      }
+
+      staticFilter += `[photo_raw]format=rgba`;
+      if (photoAngle !== 0) {
+        const rad = `${photoAngle}*PI/180`;
+        staticFilter += `,rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none`;
+      }
+      staticFilter += `[photo_rot];`;
+      staticFilter += `[photo_rot]split[p_shadow_in][p_front];`;
+      staticFilter += `[p_shadow_in]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.55,gblur=sigma=16[photo_shadow];`;
+
+      staticFilter += `[${lastV}][photo_shadow]overlay=x='${photoX}-(w-${photoW})/2+12':y='${photoY}-(h-${photoH})/2+20'[v_bg_s];`;
+      staticFilter += `[v_bg_s][p_front]overlay=x='${photoX}-(w-${photoW})/2':y='${photoY}-(h-${photoH})/2'[v${vIndex}]`;
+      lastV = `v${vIndex}`;
+      vIndex++;
+    }
+
+    if (isTituloVisible && tempTitlePath) {
       const escapedTitlePath = tempTitlePath.replace(/\\/g, '/').replace(/:/g, '\\:');
-
-      filter += `;[${lastV}]drawtext=textfile='${escapedTitlePath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
+      staticFilter += `;[${lastV}]drawtext=textfile='${escapedTitlePath}'${fontParam}:fontcolor=${tituloColor}:fontsize=${tituloSz}:x=${tituloPos}:y=${tituloY}:text_align=${tituloAlignFlag}:line_spacing=${tituloLineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     }
-    
-    if (t.artista?.visible !== false && safeArtista) {
-      const align = t.artista?.align || 'left';
-      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-86' : (t.artista?.x || 130));
-      const col = sanitizeColor(t.artista?.color, '0xB3B3B3');
-      const sz = Number(t.artista?.fontSize) || 32;
-      const yPos = Number(t.artista?.y) || 1100;
 
-      const tempArtistFileName = `temp_art_${Date.now()}.txt`;
-      tempArtistPath = path.join(mediaDir, tempArtistFileName);
-      fs.writeFileSync(tempArtistPath, safeArtista, "utf8");
+    if (isArtistaVisible && tempArtistPath) {
       const escapedArtistPath = tempArtistPath.replace(/\\/g, '/').replace(/:/g, '\\:');
-
-      filter += `;[${lastV}]drawtext=textfile='${escapedArtistPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
-      lastV = `v${vIndex}`;
-      vIndex++;
-    }
-    
-    if (t.dedicatoria?.visible !== false && escapedDedicatoria) {
-      const align = t.dedicatoria?.align || 'center';
-      const xPos = align === 'center' ? '(w-text_w)/2' : (align === 'right' ? 'w-text_w-86' : (t.dedicatoria?.x || 130));
-      const col = sanitizeColor(t.dedicatoria?.color || dedicatoriaColor, '0xE5E5E5');
-      const sz = Number(t.dedicatoria?.fontSize) || dedicatoriaSize || 30;
-      const yCoord = Number(t.dedicatoria?.y) || dedicatoriaY || 1620;
-
-      const tempDedFileName = `temp_ded_${Date.now()}.txt`;
-      tempDedPath = path.join(mediaDir, tempDedFileName);
-      fs.writeFileSync(tempDedPath, escapedDedicatoria.replace(/\\n/g, "\n"), "utf8");
-      const escapedDedPath = tempDedPath.replace(/\\/g, '/').replace(':', '\\:');
-
-      filter += `;[${lastV}]drawtext=textfile='${escapedDedPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yCoord}:line_spacing=${Math.round(sz * 0.4)}[v${vIndex}]`;
+      staticFilter += `;[${lastV}]drawtext=textfile='${escapedArtistPath}'${fontParam}:fontcolor=${artistaColor}:fontsize=${artistaSz}:x=${artistaPos}:y=${artistaY}:text_align=${artistaAlignFlag}:line_spacing=${artistaLineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     }
 
-    const inputs = tempPhotoPath ? `-loop 1 -framerate 1 -i "${tempPhotoPath}" ${bgInput}` : `-f lavfi -i color=c=black:s=1x1 ${bgInput}`;
+    if (isDedicatoriaVisible && tempDedPath) {
+      const escapedDedPath = tempDedPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+      staticFilter += `;[${lastV}]drawtext=textfile='${escapedDedPath}'${fontParam}:fontcolor=${dedicatoriaColor}:fontsize=${dedicatoriaSz}:x=${dedicatoriaPos}:y=${dedicatoriaY}:text_align=${dedicatoriaAlignFlag}:line_spacing=${dedicatoriaLineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
+      lastV = `v${vIndex}`;
+      vIndex++;
+    }
+
+    const staticOutFileName = isVideoBg ? `temp_overlay_${Date.now()}.png` : `temp_composed_${Date.now()}.png`;
+    const staticOutPath = path.join(mediaDir, staticOutFileName);
+    if (isVideoBg) {
+      tempOverlayPath = staticOutPath;
+    } else {
+      tempComposedPath = staticOutPath;
+    }
+
+    const staticInputsStr = staticInputs.length > 0 ? staticInputs.join(' ') : `-f lavfi -i color=c=black:s=1x1`;
+    const staticCmd = `ffmpeg -y -threads 0 ${staticInputsStr} -filter_complex "${staticFilter}" -map "[${lastV}]" -vframes 1 "${staticOutPath}"`;
+    await runFfmpeg(staticCmd, 60000);
+
+    // FASE 2: CODIFICACIÓN DE VIDEO RÁPIDA
     const threads = getFfmpegThreads();
-    const tuneFlag = isVideoBg ? "" : "-tune stillimage";
-    const ffmpegCommand = `ffmpeg -y -threads ${threads} ${inputs} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k ${tuneFlag} -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+    const videoFileName = `video_${Date.now()}.mp4`;
+    const videoPath = path.join(mediaDir, videoFileName);
+
+    const vis = t.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: 'white' };
+    const isVisEnabled = vis.enabled !== false;
+    const visW = Number(vis.w) || 820;
+    const visH = Number(vis.h) || 70;
+    const visX = vis.x === 'center' ? '(1080-w)/2' : (Number(vis.x) || 130);
+    const visY = Number(vis.y) || 1180;
+    const visColor = sanitizeColor(vis.color, 'white');
+
+    let ffmpegCommand = "";
+
+    if (!isVideoBg) {
+      if (isVisEnabled) {
+        const waveFilter = `[1:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.01:0.01,format=yuva420p[wave];[0:v][wave]overlay=x=${visX}:y=${visY}:shortest=1[v_out]`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${waveFilter}" -map "[v_out]" -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+      } else {
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+      }
+    } else {
+      let videoFilter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg];[bg][1:v]overlay=shortest=1[v_comp]`;
+      let finalV = 'v_comp';
+
+      if (isVisEnabled) {
+        videoFilter += `;[2:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.01:0.01,format=yuva420p[wave];[v_comp][wave]overlay=x=${visX}:y=${visY}[v_out]`;
+        finalV = 'v_out';
+      }
+
+      ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[${finalV}]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+    }
 
     await runFfmpeg(ffmpegCommand);
 
@@ -502,20 +584,25 @@ async function processJob(job: any) {
       [relativeVideoUrl, jobId]
     );
   } finally {
-    if (downloadedTempPhoto && fs.existsSync(downloadedTempPhoto)) {
-      fs.unlinkSync(downloadedTempPhoto);
+    const toClean = [
+      downloadedTempPhoto,
+      tempTitlePath,
+      tempArtistPath,
+      tempDedPath,
+      tempComposedPath,
+      tempOverlayPath
+    ];
+
+    if (tempBgPath && tempBgPath.includes('temp_bg_')) {
+      toClean.push(tempBgPath);
     }
-    if (tempBgPath && tempBgPath.includes('temp_bg_') && fs.existsSync(tempBgPath)) {
-      fs.unlinkSync(tempBgPath);
-    }
-    if (tempTitlePath && fs.existsSync(tempTitlePath)) {
-      fs.unlinkSync(tempTitlePath);
-    }
-    if (tempArtistPath && fs.existsSync(tempArtistPath)) {
-      fs.unlinkSync(tempArtistPath);
-    }
-    if (tempDedPath && fs.existsSync(tempDedPath)) {
-      fs.unlinkSync(tempDedPath);
+
+    for (const f of toClean) {
+      if (f && fs.existsSync(f)) {
+        try {
+          fs.unlinkSync(f);
+        } catch (e) {}
+      }
     }
   }
 }

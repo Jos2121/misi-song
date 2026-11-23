@@ -47,7 +47,11 @@ export async function runFfmpeg(command: string, timeoutMs = DEFAULT_TIMEOUT_MS)
 }
 
 export function getFfmpegThreads(): string {
-  return String(Math.max(1, Number(process.env.FFMPEG_THREADS || 2)));
+  if (process.env.FFMPEG_THREADS) {
+    return String(Math.max(1, Number(process.env.FFMPEG_THREADS)));
+  }
+  // En FFmpeg, "0" habilita auto-detección y aprovecha todos los núcleos/hilos disponibles de la CPU
+  return "0";
 }
 
 export async function fetchWithTimeout(
