@@ -279,52 +279,49 @@ export default defineHandler(async (event) => {
 
     // Procesar Textos: Título, Artista (Frase) y Dedicatoria
     const isTituloVisible = t.titulo?.visible !== false && Boolean(titulo);
-    const tituloAlign = t.titulo?.align || 'left';
+    const tituloAlign = (t.titulo?.align || 'left') as 'left' | 'center' | 'right';
     const tituloRawX = t.titulo?.x === 'center' || !t.titulo?.x ? 130 : Number(t.titulo.x);
     const tituloAvailableW = tituloAlign === 'center' ? 907 : Math.max(400, 993 - (tituloAlign === 'right' ? 86 : tituloRawX));
     const tituloSz = Number(t.titulo?.fontSize) || 44;
     const tituloY = Number(t.titulo?.y) || 1040;
     const tituloColor = sanitizeColor(t.titulo?.color, 'white');
-    const tituloPos = tituloAlign === 'center' ? '(w-text_w)/2' : (tituloAlign === 'right' ? 'w-text_w-86' : `${tituloRawX}`);
-    const tituloAlignFlag = tituloAlign === 'center' ? 'C' : (tituloAlign === 'right' ? 'R' : 'L');
-    const tituloLineSpacing = Math.round(tituloSz * 0.25);
+    const tituloAngle = Number(t.titulo?.angle) || 0;
+    let formattedTitulo = "";
 
     if (isTituloVisible) {
-      const formattedTitulo = wrapTextForPreview(sanitizeText(titulo), tituloSz, tituloAvailableW);
+      formattedTitulo = wrapTextForPreview(sanitizeText(titulo), tituloSz, tituloAvailableW);
       tempTitlePath = path.join(mediaDir, `temp_tit_${Date.now()}.txt`);
       fs.writeFileSync(tempTitlePath, formattedTitulo, "utf8");
     }
 
     const isArtistaVisible = t.artista?.visible !== false && Boolean(artista);
-    const artistaAlign = t.artista?.align || 'left';
+    const artistaAlign = (t.artista?.align || 'left') as 'left' | 'center' | 'right';
     const artistaRawX = t.artista?.x === 'center' || !t.artista?.x ? 130 : Number(t.artista.x);
     const artistaAvailableW = artistaAlign === 'center' ? 907 : Math.max(400, 993 - (artistaAlign === 'right' ? 86 : artistaRawX));
     const artistaSz = Number(t.artista?.fontSize) || 32;
     const artistaY = Number(t.artista?.y) || 1100;
     const artistaColor = sanitizeColor(t.artista?.color, '0xB3B3B3');
-    const artistaPos = artistaAlign === 'center' ? '(w-text_w)/2' : (artistaAlign === 'right' ? 'w-text_w-86' : `${artistaRawX}`);
-    const artistaAlignFlag = artistaAlign === 'center' ? 'C' : (artistaAlign === 'right' ? 'R' : 'L');
-    const artistaLineSpacing = Math.round(artistaSz * 0.25);
+    const artistaAngle = Number(t.artista?.angle) || 0;
+    let formattedArtista = "";
 
     if (isArtistaVisible) {
-      const formattedArtista = wrapTextForPreview(sanitizeText(artista), artistaSz, artistaAvailableW);
+      formattedArtista = wrapTextForPreview(sanitizeText(artista), artistaSz, artistaAvailableW);
       tempArtistPath = path.join(mediaDir, `temp_art_${Date.now()}.txt`);
       fs.writeFileSync(tempArtistPath, formattedArtista, "utf8");
     }
 
     const isDedicatoriaVisible = t.dedicatoria?.visible !== false && Boolean(dedicatoria);
-    const dedicatoriaAlign = t.dedicatoria?.align || 'center';
+    const dedicatoriaAlign = (t.dedicatoria?.align || 'center') as 'left' | 'center' | 'right';
     const dedicatoriaRawX = t.dedicatoria?.x === 'center' || !t.dedicatoria?.x ? 130 : Number(t.dedicatoria.x);
     const dedicatoriaAvailableW = dedicatoriaAlign === 'center' ? 907 : Math.max(400, 993 - (dedicatoriaAlign === 'right' ? 86 : dedicatoriaRawX));
     const dedicatoriaSz = Number(t.dedicatoria?.fontSize) || Number(body.dedicatoriaSize) || 30;
     const dedicatoriaY = Number(t.dedicatoria?.y) || Number(body.dedicatoriaY) || 1620;
     const dedicatoriaColor = sanitizeColor(t.dedicatoria?.color, '0xE5E5E5');
-    const dedicatoriaPos = dedicatoriaAlign === 'center' ? '(w-text_w)/2' : (dedicatoriaAlign === 'right' ? 'w-text_w-86' : `${dedicatoriaRawX}`);
-    const dedicatoriaAlignFlag = dedicatoriaAlign === 'center' ? 'C' : (dedicatoriaAlign === 'right' ? 'R' : 'L');
-    const dedicatoriaLineSpacing = Math.round(dedicatoriaSz * 0.25);
+    const dedicatoriaAngle = Number(t.dedicatoria?.angle) || 0;
+    let formattedDedicatoria = "";
 
     if (isDedicatoriaVisible) {
-      const formattedDedicatoria = wrapTextForPreview(sanitizeText(dedicatoria), dedicatoriaSz, dedicatoriaAvailableW);
+      formattedDedicatoria = wrapTextForPreview(sanitizeText(dedicatoria), dedicatoriaSz, dedicatoriaAvailableW);
       tempDedPath = path.join(mediaDir, `temp_ded_${Date.now()}.txt`);
       fs.writeFileSync(tempDedPath, formattedDedicatoria, "utf8");
     }
@@ -412,26 +409,97 @@ export default defineHandler(async (event) => {
       vIndex++;
     }
 
-    // Textos con drawtext exacto y sombra sutil
-    if (isTituloVisible && tempTitlePath) {
-      const escapedTitlePath = tempTitlePath.replace(/\\/g, '/').replace(/:/g, '\\:');
-      staticFilter += `;[${lastV}]drawtext=textfile='${escapedTitlePath}'${fontParam}:fontcolor=${tituloColor}:fontsize=${tituloSz}:x=${tituloPos}:y=${tituloY}:text_align=${tituloAlignFlag}:line_spacing=${tituloLineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
+    // Helper para renderizar texto con su ángulo e inclinación exacta idéntica a VideoEditorPreview
+    const appendTextLayer = (opts: {
+      key: string;
+      tempPath: string;
+      color: string;
+      fontSize: number;
+      y: number;
+      align: 'left' | 'center' | 'right';
+      rawX: number;
+      angle: number;
+      formattedText: string;
+    }) => {
+      const escapedPath = opts.tempPath.replace(/\\/g, '/').replace(/:/g, '\\:');
+      const lineSpacing = Math.round(opts.fontSize * 0.25);
+      const alignFlag = opts.align === 'center' ? 'C' : (opts.align === 'right' ? 'R' : 'L');
+      const pos = opts.align === 'center' ? '(w-text_w)/2' : (opts.align === 'right' ? 'w-text_w-86' : `${opts.rawX}`);
+
+      if (!opts.angle || opts.angle === 0) {
+        staticFilter += `;[${lastV}]drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${pos}:y=${opts.y}:text_align=${alignFlag}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
+        lastV = `v${vIndex}`;
+        vIndex++;
+        return;
+      }
+
+      // Si tiene ángulo, se genera en su caja y se rota según el pivote exacto
+      const boxW = opts.align === 'left' ? Math.max(300, 993 - opts.rawX) : 907;
+      const lineCount = Math.max(1, opts.formattedText.split('\n').length);
+      const approxTextH = Math.max(opts.fontSize * 1.4, lineCount * Math.round(opts.fontSize * 1.3));
+      const boxH = Math.round(approxTextH + opts.fontSize * 1.0);
+      const inBoxX = opts.align === 'center' ? '(w-text_w)/2' : (opts.align === 'right' ? 'w-text_w' : '0');
+      const rad = (opts.angle * Math.PI) / 180;
+
+      let overlayPos = "";
+      if (opts.align === 'center') {
+        overlayPos = `x=(1080-w)/2:y='${opts.y}+(${boxH}-h)/2'`;
+      } else if (opts.align === 'left') {
+        const offsetX = Math.round((boxW / 2) * Math.cos(rad));
+        const offsetY = Math.round((boxW / 2) * Math.sin(rad));
+        overlayPos = `x='${opts.rawX} + ${offsetX} - w/2':y='${Math.round(opts.y + boxH / 2)} + ${offsetY} - h/2'`;
+      } else {
+        const offsetX = Math.round((boxW / 2) * Math.cos(rad));
+        const offsetY = Math.round((boxW / 2) * Math.sin(rad));
+        overlayPos = `x='${1080 - 86} - ${offsetX} - w/2':y='${Math.round(opts.y + boxH / 2)} - ${offsetY} - h/2'`;
+      }
+
+      staticFilter += `;color=c=black@0.0:s=${boxW}x${boxH},format=rgba,drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${inBoxX}:y=(h-text_h)/2:text_align=${alignFlag}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[box_${opts.key}];[box_${opts.key}]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[rot_${opts.key}];[${lastV}][rot_${opts.key}]overlay=${overlayPos}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
+    };
+
+    // Textos con drawtext exacto, rotación respetada y sombra sutil
+    if (isTituloVisible && tempTitlePath) {
+      appendTextLayer({
+        key: 'tit',
+        tempPath: tempTitlePath,
+        color: tituloColor,
+        fontSize: tituloSz,
+        y: tituloY,
+        align: tituloAlign,
+        rawX: tituloRawX,
+        angle: tituloAngle,
+        formattedText: formattedTitulo
+      });
     }
 
     if (isArtistaVisible && tempArtistPath) {
-      const escapedArtistPath = tempArtistPath.replace(/\\/g, '/').replace(/:/g, '\\:');
-      staticFilter += `;[${lastV}]drawtext=textfile='${escapedArtistPath}'${fontParam}:fontcolor=${artistaColor}:fontsize=${artistaSz}:x=${artistaPos}:y=${artistaY}:text_align=${artistaAlignFlag}:line_spacing=${artistaLineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
-      lastV = `v${vIndex}`;
-      vIndex++;
+      appendTextLayer({
+        key: 'art',
+        tempPath: tempArtistPath,
+        color: artistaColor,
+        fontSize: artistaSz,
+        y: artistaY,
+        align: artistaAlign,
+        rawX: artistaRawX,
+        angle: artistaAngle,
+        formattedText: formattedArtista
+      });
     }
 
     if (isDedicatoriaVisible && tempDedPath) {
-      const escapedDedPath = tempDedPath.replace(/\\/g, '/').replace(/:/g, '\\:');
-      staticFilter += `;[${lastV}]drawtext=textfile='${escapedDedPath}'${fontParam}:fontcolor=${dedicatoriaColor}:fontsize=${dedicatoriaSz}:x=${dedicatoriaPos}:y=${dedicatoriaY}:text_align=${dedicatoriaAlignFlag}:line_spacing=${dedicatoriaLineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
-      lastV = `v${vIndex}`;
-      vIndex++;
+      appendTextLayer({
+        key: 'ded',
+        tempPath: tempDedPath,
+        color: dedicatoriaColor,
+        fontSize: dedicatoriaSz,
+        y: dedicatoriaY,
+        align: dedicatoriaAlign,
+        rawX: dedicatoriaRawX,
+        angle: dedicatoriaAngle,
+        formattedText: formattedDedicatoria
+      });
     }
 
     // Generar la imagen pre-compuesta (1 solo fotograma)
@@ -458,28 +526,31 @@ export default defineHandler(async (event) => {
     const visH = Number(vis.h) || 70;
     const visX = vis.x === 'center' ? '(1080-w)/2' : (Number(vis.x) || 130);
     const visY = Number(vis.y) || 1180;
-    const rawColor = vis.color || 'white';
-    const visColor = rawColor.startsWith('#') ? rawColor.replace('#', '0x') : rawColor;
+
+    // Normalizar color: respetar exactamente el color de la vista previa (hex o nombre)
+    const rawColor = vis.color || '#FFFFFF';
+    const cleanVisColor = rawColor.startsWith('#')
+      ? rawColor
+      : (rawColor.startsWith('0x') ? rawColor.replace('0x', '#') : rawColor);
 
     let ffmpegCommand = "";
 
     if (!isVideoBg) {
       // Caso 1: Fondo es imagen estática (o color)
-      // La imagen completa ya tiene portada, textos y fondo. Solo superponemos el visualizador de audio.
+      // Visualizador moderno: pasabajos para eliminar ruido caótico + compand musical + draw=full para color 100% puro
       if (isVisEnabled) {
-        const waveFilter = `[1:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.01:0.01,format=yuva420p[wave];[0:v][wave]overlay=x=${visX}:y=${visY}:shortest=1[v_out]`;
+        const waveFilter = `[1:a]aformat=channel_layouts=mono,lowpass=f=2200,compand=attacks=0.02:decays=0.15:points=-80/-80|-40/-18|-20/-4|0/-1,showwaves=s=${visW}x${visH}:mode=cline:scale=sqrt:draw=full:colors='${cleanVisColor}',colorkey=0x000000:0.02:0.01,format=yuva420p[wave];[0:v][wave]overlay=x=${visX}:y=${visY}:shortest=1[v_out]`;
         ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${waveFilter}" -map "[v_out]" -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       } else {
         ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       }
     } else {
       // Caso 2: Fondo es Video MP4 (Live Wallpaper)
-      // Superpone el overlay estático transparente sobre el video en loop, más el visualizador.
       let videoFilter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg];[bg][1:v]overlay=shortest=1[v_comp]`;
       let finalV = 'v_comp';
 
       if (isVisEnabled) {
-        videoFilter += `;[2:a]showwaves=s=${visW}x${visH}:mode=cline:colors=${visColor}:scale=sqrt,colorkey=0x000000:0.01:0.01,format=yuva420p[wave];[v_comp][wave]overlay=x=${visX}:y=${visY}[v_out]`;
+        videoFilter += `;[2:a]aformat=channel_layouts=mono,lowpass=f=2200,compand=attacks=0.02:decays=0.15:points=-80/-80|-40/-18|-20/-4|0/-1,showwaves=s=${visW}x${visH}:mode=cline:scale=sqrt:draw=full:colors='${cleanVisColor}',colorkey=0x000000:0.02:0.01,format=yuva420p[wave];[v_comp][wave]overlay=x=${visX}:y=${visY}[v_out]`;
         finalV = 'v_out';
       }
 
