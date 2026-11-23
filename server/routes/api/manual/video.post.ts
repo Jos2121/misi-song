@@ -357,13 +357,21 @@ export default defineHandler(async (event) => {
         const col = sanitizeColor(t.titulo?.color, 'white');
         const sz = Number(t.titulo?.fontSize) || 44;
         const yPos = Number(t.titulo?.y) || 1040;
+        const angle = Number(t.titulo?.angle) || 0;
 
         const tempTitleFileName = `temp_tit_${Date.now()}.txt`;
         tempTitlePath = path.join(mediaDir, tempTitleFileName);
         fs.writeFileSync(tempTitlePath, safeTitulo, "utf8");
         const escapedTitlePath = tempTitlePath.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-        filter += `;[${lastV}]drawtext=textfile='${escapedTitlePath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
+        if (angle === 0) {
+          filter += `;[${lastV}]drawtext=textfile='${escapedTitlePath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
+        } else {
+          const boxW = 1000;
+          const boxH = Math.max(160, Math.round(sz * 3));
+          const rad = `${angle}*PI/180`;
+          filter += `;color=c=black@0.0:s=${boxW}x${boxH}:d=1,format=rgba,drawtext=textfile='${escapedTitlePath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=(h-text_h)/2[tit_box];[tit_box]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[tit_rot];[${lastV}][tit_rot]overlay=x=(1080-w)/2:y=${yPos}-(h-${boxH})/2[v${vIndex}]`;
+        }
         lastV = `v${vIndex}`;
         vIndex++;
       }
@@ -374,13 +382,21 @@ export default defineHandler(async (event) => {
         const col = sanitizeColor(t.artista?.color, '0xB3B3B3');
         const sz = Number(t.artista?.fontSize) || 32;
         const yPos = Number(t.artista?.y) || 1100;
+        const angle = Number(t.artista?.angle) || 0;
 
         const tempArtistFileName = `temp_art_${Date.now()}.txt`;
         tempArtistPath = path.join(mediaDir, tempArtistFileName);
         fs.writeFileSync(tempArtistPath, safeArtista, "utf8");
         const escapedArtistPath = tempArtistPath.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-        filter += `;[${lastV}]drawtext=textfile='${escapedArtistPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
+        if (angle === 0) {
+          filter += `;[${lastV}]drawtext=textfile='${escapedArtistPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yPos}[v${vIndex}]`;
+        } else {
+          const boxW = 1000;
+          const boxH = Math.max(140, Math.round(sz * 3));
+          const rad = `${angle}*PI/180`;
+          filter += `;color=c=black@0.0:s=${boxW}x${boxH}:d=1,format=rgba,drawtext=textfile='${escapedArtistPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=(h-text_h)/2[art_box];[art_box]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[art_rot];[${lastV}][art_rot]overlay=x=(1080-w)/2:y=${yPos}-(h-${boxH})/2[v${vIndex}]`;
+        }
         lastV = `v${vIndex}`;
         vIndex++;
       }
@@ -391,6 +407,7 @@ export default defineHandler(async (event) => {
         const col = sanitizeColor(t.dedicatoria?.color || dedicatoriaColor, '0xE5E5E5');
         const sz = Number(t.dedicatoria?.fontSize) || dedicatoriaSize || 30;
         const yCoord = Number(t.dedicatoria?.y) || dedicatoriaY || 1620;
+        const angle = Number(t.dedicatoria?.angle) || 0;
 
         const tempDedFileName = `temp_ded_${Date.now()}.txt`;
         tempDedPath = path.join(mediaDir, tempDedFileName);
@@ -398,7 +415,14 @@ export default defineHandler(async (event) => {
         fs.writeFileSync(tempDedPath, escapedDedicatoria.replace(/\\n/g, "\n"), "utf8");
         const escapedDedPath = tempDedPath.replace(/\\/g, '/').replace(/:/g, '\\:');
 
-        filter += `;[${lastV}]drawtext=textfile='${escapedDedPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yCoord}:line_spacing=${Math.round(sz * 0.4)}[v${vIndex}]`;
+        if (angle === 0) {
+          filter += `;[${lastV}]drawtext=textfile='${escapedDedPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=${yCoord}:line_spacing=${Math.round(sz * 0.4)}[v${vIndex}]`;
+        } else {
+          const boxW = 1000;
+          const boxH = Math.max(340, Math.round(sz * 8));
+          const rad = `${angle}*PI/180`;
+          filter += `;color=c=black@0.0:s=${boxW}x${boxH}:d=1,format=rgba,drawtext=textfile='${escapedDedPath}'${fontParam}:fontcolor=${col}:fontsize=${sz}:x=${xPos}:y=(h-text_h)/2:line_spacing=${Math.round(sz * 0.4)}[ded_box];[ded_box]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[ded_rot];[${lastV}][ded_rot]overlay=x=(1080-w)/2:y=${yCoord}-(h-${boxH})/2[v${vIndex}]`;
+        }
         lastV = `v${vIndex}`;
         vIndex++;
       }

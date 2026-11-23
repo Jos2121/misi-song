@@ -43,12 +43,15 @@ export interface VideoEditorPreviewProps {
   tituloX?: number | string;
   tituloY?: number;
   tituloSize?: number;
+  tituloAngle?: number;
   artistaX?: number | string;
   artistaY?: number;
   artistaSize?: number;
+  artistaAngle?: number;
   dedicatoriaX?: number | string;
   dedicatoriaY?: number;
   dedicatoriaSize?: number;
+  dedicatoriaAngle?: number;
 
   visualizer?: {
     enabled?: boolean;
@@ -86,19 +89,22 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
   tituloX,
   tituloY,
   tituloSize,
+  tituloAngle,
   artistaX,
   artistaY,
   artistaSize,
+  artistaAngle,
   dedicatoriaX,
   dedicatoriaY,
   dedicatoriaSize,
+  dedicatoriaAngle,
   visualizer,
   
   scale
 }) => {
 
   const renderTextNode = (key: 'titulo' | 'artista' | 'dedicatoria', text: string, placeholder: string) => {
-    const t = config?.[key] || { x: 130, y: 1040, fontSize: 36, color: 'white', align: 'left', visible: true };
+    const t = config?.[key] || { x: 130, y: 1040, fontSize: 36, color: 'white', align: 'left', visible: true, angle: 0 };
     
     // Si la visibilidad está desactivada, no se renderiza
     if (t.visible === false) return null;
@@ -107,22 +113,27 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
     let activeX: number | string = t.x;
     let activeY: number = t.y;
     let activeSize: number = t.fontSize;
+    let activeAngle: number = t.angle ?? 0;
 
     if (key === 'titulo') {
       if (tituloX !== undefined) activeX = tituloX;
       if (tituloY !== undefined) activeY = tituloY;
       if (tituloSize !== undefined) activeSize = tituloSize;
+      if (tituloAngle !== undefined) activeAngle = tituloAngle;
     } else if (key === 'artista') {
       if (artistaX !== undefined) activeX = artistaX;
       if (artistaY !== undefined) activeY = artistaY;
       if (artistaSize !== undefined) activeSize = artistaSize;
+      if (artistaAngle !== undefined) activeAngle = artistaAngle;
     } else if (key === 'dedicatoria') {
       if (dedicatoriaX !== undefined) activeX = dedicatoriaX;
       if (dedicatoriaY !== undefined) activeY = dedicatoriaY;
       if (dedicatoriaSize !== undefined) activeSize = dedicatoriaSize;
+      if (dedicatoriaAngle !== undefined) activeAngle = dedicatoriaAngle;
     }
 
     const align = t.align || (key === 'dedicatoria' ? 'center' : 'left');
+    const angle = Number(activeAngle);
 
     const styleObj: React.CSSProperties = {
       top: `${(activeY / 1920) * 100}%`,
@@ -134,17 +145,22 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
 
     if (align === 'center') {
       styleObj.left = '50%';
-      styleObj.transform = 'translateX(-50%)';
+      styleObj.transform = angle !== 0 ? `translateX(-50%) rotate(${angle}deg)` : 'translateX(-50%)';
+      styleObj.transformOrigin = 'center center';
       styleObj.width = '84%';
       styleObj.maxWidth = '84%';
     } else if (align === 'right') {
       styleObj.right = '8%';
+      styleObj.transform = angle !== 0 ? `rotate(${angle}deg)` : undefined;
+      styleObj.transformOrigin = 'right center';
       styleObj.width = '84%';
       styleObj.maxWidth = '84%';
     } else {
       // left
       const leftPercent = activeX === 'center' ? '8%' : `${(Number(activeX) / 1080) * 100}%`;
       styleObj.left = leftPercent;
+      styleObj.transform = angle !== 0 ? `rotate(${angle}deg)` : undefined;
+      styleObj.transformOrigin = 'left center';
       styleObj.width = `calc(92% - ${leftPercent})`;
       styleObj.maxWidth = '84%';
     }

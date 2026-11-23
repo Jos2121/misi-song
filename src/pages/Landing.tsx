@@ -56,6 +56,7 @@ export default function Landing() {
   const [tituloColor, setTituloColor] = useState<string>('white');
   const [tituloAlign, setTituloAlign] = useState<'left' | 'center' | 'right'>('left');
   const [tituloVisible, setTituloVisible] = useState<boolean>(true);
+  const [tituloAngle, setTituloAngle] = useState<number>(0);
   
   const [artistaX, setArtistaX] = useState<number | string>(130);
   const [artistaY, setArtistaY] = useState<number>(1100);
@@ -63,6 +64,7 @@ export default function Landing() {
   const [artistaColor, setArtistaColor] = useState<string>('#B3B3B3');
   const [artistaAlign, setArtistaAlign] = useState<'left' | 'center' | 'right'>('left');
   const [artistaVisible, setArtistaVisible] = useState<boolean>(true);
+  const [artistaAngle, setArtistaAngle] = useState<number>(0);
   
   const [dedicatoriaX, setDedicatoriaX] = useState<number | string>(540);
   const [dedicatoriaY, setDedicatoriaY] = useState<number>(1620);
@@ -70,6 +72,7 @@ export default function Landing() {
   const [dedicatoriaColor, setDedicatoriaColor] = useState<string>('#E5E5E5');
   const [dedicatoriaAlign, setDedicatoriaAlign] = useState<'left' | 'center' | 'right'>('center');
   const [dedicatoriaVisible, setDedicatoriaVisible] = useState<boolean>(true);
+  const [dedicatoriaAngle, setDedicatoriaAngle] = useState<number>(0);
 
   // User input states
   const [userPhotoUrl, setUserPhotoUrl] = useState<string>('');
@@ -119,7 +122,8 @@ export default function Landing() {
       fontSize: Number(tituloSize),
       color: tituloColor,
       align: tituloAlign,
-      visible: tituloVisible
+      visible: tituloVisible,
+      angle: Number(tituloAngle)
     },
     artista: {
       x: artistaX,
@@ -127,7 +131,8 @@ export default function Landing() {
       fontSize: Number(artistaSize),
       color: artistaColor,
       align: artistaAlign,
-      visible: artistaVisible
+      visible: artistaVisible,
+      angle: Number(artistaAngle)
     },
     dedicatoria: {
       x: dedicatoriaX,
@@ -135,7 +140,8 @@ export default function Landing() {
       fontSize: Number(dedicatoriaSize),
       color: dedicatoriaColor,
       align: dedicatoriaAlign,
-      visible: dedicatoriaVisible
+      visible: dedicatoriaVisible,
+      angle: Number(dedicatoriaAngle)
     },
     visualizer: visualizer
   };
@@ -219,6 +225,7 @@ export default function Landing() {
     const tColor = configData.tituloColor ?? configData.titulo?.color ?? 'white';
     const tAlign = configData.tituloAlign ?? configData.titulo?.align ?? 'left';
     const tVis = configData.tituloVisible ?? configData.titulo?.visible ?? true;
+    const tAngle = configData.tituloAngle ?? configData.titulo?.angle ?? 0;
 
     setTituloX(tX);
     setTituloY(Number(tY));
@@ -226,6 +233,7 @@ export default function Landing() {
     setTituloColor(tColor);
     setTituloAlign(tAlign);
     setTituloVisible(tVis !== false);
+    setTituloAngle(Number(tAngle));
 
     const aX = configData.artistaX ?? configData.artista?.x ?? 130;
     const aY = configData.artistaY ?? configData.artista?.y ?? 1100;
@@ -233,6 +241,7 @@ export default function Landing() {
     const aColor = configData.artistaColor ?? configData.artista?.color ?? '#B3B3B3';
     const aAlign = configData.artistaAlign ?? configData.artista?.align ?? 'left';
     const aVis = configData.artistaVisible ?? configData.artista?.visible ?? true;
+    const aAngle = configData.artistaAngle ?? configData.artista?.angle ?? 0;
 
     setArtistaX(aX);
     setArtistaY(Number(aY));
@@ -240,6 +249,7 @@ export default function Landing() {
     setArtistaColor(aColor);
     setArtistaAlign(aAlign);
     setArtistaVisible(aVis !== false);
+    setArtistaAngle(Number(aAngle));
 
     const dX = configData.dedicatoriaX ?? configData.dedicatoryX ?? configData.dedicatoria?.x ?? 540;
     const dY = configData.dedicatoriaY ?? configData.dedicatoryY ?? configData.dedicatoria?.y ?? 1620;
@@ -247,6 +257,7 @@ export default function Landing() {
     const dColor = configData.dedicatoriaColor ?? configData.dedicatoria?.color ?? '#E5E5E5';
     const dAlign = configData.dedicatoriaAlign ?? configData.dedicatoria?.align ?? 'center';
     const dVis = configData.dedicatoriaVisible ?? configData.dedicatoria?.visible ?? true;
+    const dAngle = configData.dedicatoriaAngle ?? configData.dedicatoria?.angle ?? 0;
     
     setDedicatoriaX(dX);
     setDedicatoriaY(Number(dY));
@@ -254,6 +265,7 @@ export default function Landing() {
     setDedicatoriaColor(dColor);
     setDedicatoriaAlign(dAlign);
     setDedicatoriaVisible(dVis !== false);
+    setDedicatoriaAngle(Number(dAngle));
 
     const vis = configData.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' };
     setVisualizer(vis);
@@ -264,9 +276,9 @@ export default function Landing() {
       bgUrl: configData.bgUrl || t.bgUrl || '',
       photo: { x: Number(pX), y: Number(pY), w: Number(pW), h: Number(pH), frame: pFrame !== false, angle: Number(pAngle) },
       pergamino: configData.pergamino || { ...DEFAULT_TEMPLATE.pergamino },
-      titulo: { x: tX, y: Number(tY), fontSize: Number(tSize), color: tColor, align: tAlign, visible: tVis !== false },
-      artista: { x: aX, y: Number(aY), fontSize: Number(aSize), color: aColor, align: aAlign, visible: aVis !== false },
-      dedicatoria: { x: dX, y: Number(dY), fontSize: Number(dSize), color: dColor, align: dAlign, visible: dVis !== false },
+      titulo: { x: tX, y: Number(tY), fontSize: Number(tSize), color: tColor, align: tAlign, visible: tVis !== false, angle: Number(tAngle) },
+      artista: { x: aX, y: Number(aY), fontSize: Number(aSize), color: aColor, align: aAlign, visible: aVis !== false, angle: Number(aAngle) },
+      dedicatoria: { x: dX, y: Number(dY), fontSize: Number(dSize), color: dColor, align: dAlign, visible: dVis !== false, angle: Number(dAngle) },
       visualizer: vis
     });
   };

@@ -69,6 +69,7 @@ export interface TemplateTextNode {
   color: string;
   align: 'left' | 'center' | 'right';
   visible?: boolean;
+  angle?: number;
 }
 
 export interface TemplateConfig {
@@ -97,9 +98,9 @@ export const DEFAULT_TEMPLATE: TemplateConfig = {
   bgUrl: '',
   photo: { x: 130, y: 180, w: 820, h: 820, frame: true, angle: -3 },
   pergamino: { url: '', x: 130, y: 1040, w: 820, h: 380, angle: 0, visible: true },
-  titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true },
-  artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true },
-  dedicatoria: { x: 540, y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true },
+  titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true, angle: 0 },
+  artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true, angle: 0 },
+  dedicatoria: { x: 540, y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true, angle: 0 },
   visualizer: { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: '#FFFFFF' },
 };
 
@@ -308,7 +309,8 @@ export default function Dashboard() {
           y: Number(config.titulo.y),
           fontSize: Number(config.titulo.fontSize),
           align: config.titulo.align || 'left',
-          visible: config.titulo.visible !== false
+          visible: config.titulo.visible !== false,
+          angle: Number(config.titulo.angle ?? 0)
         },
         artista: {
           ...config.artista,
@@ -316,7 +318,8 @@ export default function Dashboard() {
           y: Number(config.artista.y),
           fontSize: Number(config.artista.fontSize),
           align: config.artista.align || 'left',
-          visible: config.artista.visible !== false
+          visible: config.artista.visible !== false,
+          angle: Number(config.artista.angle ?? 0)
         },
         dedicatoria: {
           ...config.dedicatoria,
@@ -324,7 +327,8 @@ export default function Dashboard() {
           y: Number(config.dedicatoria.y),
           fontSize: Number(dedicatoriaSz),
           align: config.dedicatoria.align || 'center',
-          visible: config.dedicatoria.visible !== false
+          visible: config.dedicatoria.visible !== false,
+          angle: Number(config.dedicatoria.angle ?? 0)
         }
       };
 
@@ -1119,6 +1123,18 @@ export default function Dashboard() {
               />
             </div>
             <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold" title="Inclinación en grados">Ángulo:</span>
+              <input
+                type="number"
+                value={node.angle ?? 0}
+                onChange={(e) => setConfig({
+                  ...config,
+                  [key]: { ...node, angle: Number(e.target.value) }
+                })}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
               <span className="text-[10px] text-neutral-400 uppercase font-bold">Color:</span>
               <input
                 type="color"
@@ -1838,7 +1854,8 @@ export default function Dashboard() {
                                   fontSize: Number(tSize),
                                   color: tColor,
                                   align: tAlign,
-                                  visible: tVis !== false
+                                  visible: tVis !== false,
+                                  angle: Number(parsedConfig.tituloAngle ?? parsedConfig.titulo?.angle ?? 0)
                                 },
                                 artista: {
                                   x: aX,
@@ -1846,7 +1863,8 @@ export default function Dashboard() {
                                   fontSize: Number(aSize),
                                   color: aColor,
                                   align: aAlign,
-                                  visible: aVis !== false
+                                  visible: aVis !== false,
+                                  angle: Number(parsedConfig.artistaAngle ?? parsedConfig.artista?.angle ?? 0)
                                 },
                                 dedicatoria: {
                                   x: dX,
@@ -1854,7 +1872,8 @@ export default function Dashboard() {
                                   fontSize: Number(dedSize),
                                   color: dColor,
                                   align: dAlign,
-                                  visible: dVis !== false
+                                  visible: dVis !== false,
+                                  angle: Number(parsedConfig.dedicatoriaAngle ?? parsedConfig.dedicatoria?.angle ?? 0)
                                 },
                                 visualizer: vis
                               };
