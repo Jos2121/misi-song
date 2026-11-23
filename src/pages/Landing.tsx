@@ -48,6 +48,7 @@ export default function Landing() {
   const [photoWidth, setPhotoWidth] = useState<number>(820);
   const [photoHeight, setPhotoHeight] = useState<number>(820);
   const [photoFrame, setPhotoFrame] = useState<boolean>(true);
+  const [photoAngle, setPhotoAngle] = useState<number>(-3);
   
   const [tituloX, setTituloX] = useState<number | string>(130);
   const [tituloY, setTituloY] = useState<number>(1040);
@@ -108,8 +109,10 @@ export default function Landing() {
       y: Number(photoY),
       w: Number(photoWidth),
       h: Number(photoHeight),
-      frame: photoFrame
+      frame: photoFrame,
+      angle: Number(photoAngle)
     },
+    pergamino: baseConfig.pergamino,
     titulo: {
       x: tituloX,
       y: Number(tituloY),
@@ -201,12 +204,14 @@ export default function Landing() {
     const pW = configData.photoWidth ?? configData.photo?.w ?? 820;
     const pH = configData.photoHeight ?? configData.photo?.h ?? 820;
     const pFrame = configData.photoFrame ?? configData.photo?.frame ?? true;
+    const pAngle = configData.photoAngle ?? configData.photo?.angle ?? -3;
 
     setPhotoX(Number(pX));
     setPhotoY(Number(pY));
     setPhotoWidth(Number(pW));
     setPhotoHeight(Number(pH));
     setPhotoFrame(pFrame !== false);
+    setPhotoAngle(Number(pAngle));
 
     const tX = configData.tituloX ?? configData.titulo?.x ?? 130;
     const tY = configData.tituloY ?? configData.titulo?.y ?? 1040;
@@ -257,7 +262,8 @@ export default function Landing() {
       id: t.id,
       name: t.name || 'Plantilla',
       bgUrl: configData.bgUrl || t.bgUrl || '',
-      photo: { x: Number(pX), y: Number(pY), w: Number(pW), h: Number(pH), frame: pFrame !== false },
+      photo: { x: Number(pX), y: Number(pY), w: Number(pW), h: Number(pH), frame: pFrame !== false, angle: Number(pAngle) },
+      pergamino: configData.pergamino || { ...DEFAULT_TEMPLATE.pergamino },
       titulo: { x: tX, y: Number(tY), fontSize: Number(tSize), color: tColor, align: tAlign, visible: tVis !== false },
       artista: { x: aX, y: Number(aY), fontSize: Number(aSize), color: aColor, align: aAlign, visible: aVis !== false },
       dedicatoria: { x: dX, y: Number(dY), fontSize: Number(dSize), color: dColor, align: dAlign, visible: dVis !== false },
@@ -845,13 +851,13 @@ export default function Landing() {
                   {artistaVisible !== false && (
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Firma</Label>
+                        <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Frase</Label>
                         <span className="text-[10px] text-neutral-400 font-mono">{artista.length}/25</span>
                       </div>
                       <Input
                         value={artista}
                         onChange={e => setArtista(e.target.value)}
-                        placeholder="Ej. Juan y María / Tu Firma"
+                        placeholder="Ej. Tú y Yo / Una frase especial"
                         className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] transition-all"
                         maxLength={25}
                       />
@@ -861,7 +867,7 @@ export default function Landing() {
                   {dedicatoriaVisible !== false && (
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Dedicatoria Final</Label>
+                        <Label className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">Dedicatoria</Label>
                         <span className="text-[10px] text-neutral-400 font-mono">{dedicatoria.length}/70</span>
                       </div>
                       <Textarea
@@ -1056,8 +1062,8 @@ export default function Landing() {
                 <p className="text-xs font-bold text-neutral-800 truncate">{titulo || 'Sin título'}</p>
               </div>
               <div className="bg-white p-3 rounded-xl border border-neutral-100">
-                <p className="text-[9px] text-neutral-400 uppercase font-bold">Firma</p>
-                <p className="text-xs font-bold text-neutral-800 truncate">{artista || 'Sin firma'}</p>
+                <p className="text-[9px] text-neutral-400 uppercase font-bold">Frase</p>
+                <p className="text-xs font-bold text-neutral-800 truncate">{artista || 'Sin frase'}</p>
               </div>
             </div>
             <Button

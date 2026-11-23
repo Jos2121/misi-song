@@ -21,7 +21,7 @@ export interface VideoEditorPreviewProps {
   customBackground?: string;
   userPhotoUrl: string;
   titulo: string;
-  artista: string; // Utilizado para la Firma
+  artista: string; // Utilizado para la Frase (anteriormente Firma)
   dedicatoria: string;
   
   // Explicit coordinate overrides
@@ -29,6 +29,17 @@ export interface VideoEditorPreviewProps {
   photoY?: number;
   photoWidth?: number;
   photoHeight?: number;
+  photoAngle?: number;
+
+  // Pergamino overlay (fondo transparente para dedicatoria)
+  pergaminoUrl?: string;
+  pergaminoX?: number;
+  pergaminoY?: number;
+  pergaminoWidth?: number;
+  pergaminoHeight?: number;
+  pergaminoAngle?: number;
+  pergaminoVisible?: boolean;
+
   tituloX?: number | string;
   tituloY?: number;
   tituloSize?: number;
@@ -64,6 +75,14 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
   photoY,
   photoWidth,
   photoHeight,
+  photoAngle,
+  pergaminoUrl,
+  pergaminoX,
+  pergaminoY,
+  pergaminoWidth,
+  pergaminoHeight,
+  pergaminoAngle,
+  pergaminoVisible,
   tituloX,
   tituloY,
   tituloSize,
@@ -144,7 +163,18 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
   const finalPhotoY = photoY !== undefined ? photoY : (config?.photo?.y ?? 180);
   const finalPhotoW = photoWidth !== undefined ? photoWidth : (config?.photo?.w ?? 820);
   const finalPhotoH = photoHeight !== undefined ? photoHeight : (config?.photo?.h ?? 820);
+  const finalPhotoAngle = photoAngle !== undefined ? photoAngle : (config?.photo?.angle ?? -3);
   const hasPolaroidFrame = config?.photo?.frame !== false;
+
+  // Pergamino resolution
+  const pergaminoCfg = config?.pergamino;
+  const finalPergaminoUrl = pergaminoUrl !== undefined ? pergaminoUrl : pergaminoCfg?.url;
+  const finalPergaminoX = pergaminoX !== undefined ? pergaminoX : (pergaminoCfg?.x ?? 130);
+  const finalPergaminoY = pergaminoY !== undefined ? pergaminoY : (pergaminoCfg?.y ?? 1040);
+  const finalPergaminoW = pergaminoWidth !== undefined ? pergaminoWidth : (pergaminoCfg?.w ?? 820);
+  const finalPergaminoH = pergaminoHeight !== undefined ? pergaminoHeight : (pergaminoCfg?.h ?? 380);
+  const finalPergaminoAngle = pergaminoAngle !== undefined ? pergaminoAngle : (pergaminoCfg?.angle ?? 0);
+  const isPergaminoVisible = pergaminoVisible !== undefined ? pergaminoVisible : (pergaminoCfg?.visible !== false);
 
   // Background resolution
   const resolvedBg = (() => {
@@ -247,14 +277,17 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
         <div className="absolute inset-0 w-full h-full bg-gray-900" />
       )}
 
-      {/* Cover Photo: Polaroid Frame or Standard */}
+      {/* Cover Photo: Polaroid Frame or Standard with angle & drop shadow */}
       <div
-        className="absolute"
+        className="absolute transition-transform duration-200"
         style={{
           left: `${(finalPhotoX / 1080) * 100}%`,
           top: `${(finalPhotoY / 1920) * 100}%`,
           width: `${(finalPhotoW / 1080) * 100}%`,
           height: `${(finalPhotoH / 1920) * 100}%`,
+          transform: finalPhotoAngle ? `rotate(${finalPhotoAngle}deg)` : 'none',
+          transformOrigin: 'center center',
+          filter: 'drop-shadow(0 20px 28px rgba(0,0,0,0.55)) drop-shadow(0 8px 12px rgba(0,0,0,0.35))',
         }}
       >
         {hasPolaroidFrame ? (
@@ -286,9 +319,31 @@ export const VideoEditorPreview: React.FC<VideoEditorPreviewProps> = ({
         )}
       </div>
 
-      {/* Texts in Cursive */}
+      {/* Pergamino / Fondo de Dedicatoria (PNG Transparente) */}
+      {isPergaminoVisible && finalPergaminoUrl && (
+        <div
+          className="absolute pointer-events-none select-none transition-transform duration-200"
+          style={{
+            left: `${(finalPergaminoX / 1080) * 100}%`,
+            top: `${(finalPergaminoY / 1920) * 100}%`,
+            width: `${(finalPergaminoW / 1080) * 100}%`,
+            height: `${(finalPergaminoH / 1920) * 100}%`,
+            transform: finalPergaminoAngle ? `rotate(${finalPergaminoAngle}deg)` : 'none',
+            transformOrigin: 'center center',
+            filter: 'drop-shadow(0 12px 20px rgba(0,0,0,0.35))',
+          }}
+        >
+          <img
+            src={finalPergaminoUrl.trim()}
+            alt="Pergamino"
+            className="w-full h-full object-fill"
+          />
+        </div>
+      )}
+
+      {/* Texts in Cursive: 1. Título, 2. Frase, 3. Dedicatoria */}
       {renderTextNode('titulo', titulo, 'Título de Canción')}
-      {renderTextNode('artista', artista, 'Firma')}
+      {renderTextNode('artista', artista, 'Frase')}
       {renderTextNode('dedicatoria', dedicatoria, 'Mensaje de dedicatoria...')}
 
       {/* Visualización Musical */}

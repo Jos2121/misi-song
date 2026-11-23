@@ -43,6 +43,8 @@ export default defineHandler(async (event) => {
   let tempTitlePath = "";
   let tempArtistPath = "";
   let tempDedPath = "";
+  let finalPergaminoPath = "";
+  let tempPergaminoPath = "";
   
   try {
     const targetImage = userPhotoUrl || imageUrl;
@@ -174,12 +176,48 @@ export default defineHandler(async (event) => {
       const safeArtista = sanitize(artista);
       const escapedDedicatoria = wrapText(sanitize(dedicatoria));
 
-      const t = templateConfig || {
-        photo: { x: 130, y: 180, w: 820, h: 820, frame: true },
+      const t = templateConfig || (job?.config ? (typeof job.config === 'string' ? JSON.parse(job.config) : job.config) : null) || {
+        photo: { x: 130, y: 180, w: 820, h: 820, frame: true, angle: -3 },
+        pergamino: { url: '', x: 130, y: 1040, w: 820, h: 380, angle: 0, visible: true },
         titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true },
         artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true },
         dedicatoria: { x: 'center', y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true }
       };
+
+      // Localizar y descargar pergamino transparente si está configurado
+      const targetPergamino = body.pergaminoUrl || t.pergamino?.url;
+      if (targetPergamino && t.pergamino?.visible !== false) {
+        if (targetPergamino.startsWith("http")) {
+          try {
+            const pRes = await fetchWithTimeout(targetPergamino, {}, 20000);
+            if (pRes.ok) {
+              tempPergaminoPath = path.join(mediaDir, `temp_perg_${Date.now()}.png`);
+              fs.writeFileSync(tempPergaminoPath, Buffer.from(await pRes.arrayBuffer()));
+              finalPergaminoPath = tempPergaminoPath;
+            }
+          } catch (e) {
+            console.warn("Error descargando pergamino:", e);
+          }
+        } else if (targetPergamino.startsWith("data:image/")) {
+          const matches = targetPergamino.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            tempPergaminoPath = path.join(mediaDir, `temp_perg_${Date.now()}.png`);
+            fs.writeFileSync(tempPergaminoPath, Buffer.from(matches[2], 'base64'));
+            finalPergaminoPath = tempPergaminoPath;
+          }
+        } else {
+          const cleanPName = path.basename(targetPergamino.split('?')[0].split('#')[0]);
+          const pCandidates = [
+            path.join(mediaDir, cleanPName),
+            path.resolve(process.cwd(), "public", targetPergamino.replace(/^\//, '')),
+            path.resolve(process.cwd(), "public/media", cleanPName)
+          ];
+          const foundP = pCandidates.find(p => fs.existsSync(p));
+          if (foundP) {
+            finalPergaminoPath = foundP;
+          }
+        }
+      }
 
       const sanitizeColor = (col?: string, defaultCol = 'white') => {
         if (!col) return defaultCol;
@@ -196,6 +234,7 @@ export default defineHandler(async (event) => {
       const photoH = Number(t.photo?.h) || 820;
       const photoX = Number(t.photo?.x) || 130;
       const photoY = Number(t.photo?.y) || 180;
+      const photoAngle = Number(t.photo?.angle !== undefined ? t.photo.angle : -3);
       const hasPolaroidFrame = t.photo?.frame !== false;
 
       const bgInput = tempBgPath
@@ -215,17 +254,50 @@ export default defineHandler(async (event) => {
 
         filter += `color=c=white:s=${photoW}x${photoH}:d=1,fps=25[polaroid_card];`;
         filter += `[0:v]scale=w=${innerW}:h=${innerH}:force_original_aspect_ratio=increase,crop=${innerW}:${innerH}:(in_w-${innerW})/2:(in_h-${innerH})/2,fps=25[inner_photo];`;
-        filter += `[polaroid_card][inner_photo]overlay=x=${padX}:y=${padTop}[photo];`;
+        filter += `[polaroid_card][inner_photo]overlay=x=${padX}:y=${padTop}[photo_raw];`;
       } else {
         // Recorte dinámico basado en las dimensiones de la foto
-        filter += `[0:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2[photo];`;
+        filter += `[0:v]scale=w=${photoW}:h=${photoH}:force_original_aspect_ratio=increase,crop=${photoW}:${photoH}:(in_w-${photoW})/2:(in_h-${photoH})/2[photo_raw];`;
       }
 
-      // Overlay foto en fondo
-      filter += `[bg_base][photo]overlay=x=${photoX}:y=${photoY}[v1]`;
+      // Inclinación/Ángulo y Sombra para que resalte la foto
+      filter += `[photo_raw]format=rgba`;
+      if (photoAngle !== 0) {
+        const rad = `${photoAngle}*PI/180`;
+        filter += `,rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none`;
+      }
+      filter += `[photo_rot];`;
+
+      // Generar sombra difusa
+      filter += `[photo_rot]split[p_shadow_in][p_front];`;
+      filter += `[p_shadow_in]colorchannelmixer=rr=0:gg=0:bb=0:aa=0.5,gblur=sigma=16[photo_shadow];`;
+
+      // Superponer primero la sombra con offset y luego la foto
+      filter += `[bg_base][photo_shadow]overlay=x='${photoX}-(w-${photoW})/2+12':y='${photoY}-(h-${photoH})/2+20':shortest=1[v_bg_s];`;
+      filter += `[v_bg_s][p_front]overlay=x='${photoX}-(w-${photoW})/2':y='${photoY}-(h-${photoH})/2':shortest=1[v1]`;
 
       let lastV = 'v1';
       let vIndex = 2;
+
+      // Pergamino / Fondo transparente para dedicatoria
+      if (finalPergaminoPath) {
+        const pergaminoW = Number(t.pergamino?.w) || 820;
+        const pergaminoH = Number(t.pergamino?.h) || 380;
+        const pergaminoX = Number(t.pergamino?.x) || 130;
+        const pergaminoY = Number(t.pergamino?.y) || 1040;
+        const pergaminoAngle = Number(t.pergamino?.angle) || 0;
+
+        let pergFilter = `[3:v]scale=${pergaminoW}:${pergaminoH},format=rgba`;
+        if (pergaminoAngle !== 0) {
+          const pRad = `${pergaminoAngle}*PI/180`;
+          pergFilter += `,rotate=${pRad}:ow='rotw(${pRad})':oh='roth(${pRad})':c=none`;
+        }
+        pergFilter += `[perg_layer];`;
+        filter += `;` + pergFilter;
+        filter += `[${lastV}][perg_layer]overlay=x='${pergaminoX}-(w-${pergaminoW})/2':y='${pergaminoY}-(h-${pergaminoH})/2'[v${vIndex}]`;
+        lastV = `v${vIndex}`;
+        vIndex++;
+      }
 
       // Visualización musical de la canción (showwaves)
       const vis = t.visualizer || { enabled: true, x: 130, y: 1180, w: 820, h: 70, color: 'white' };
@@ -333,7 +405,8 @@ export default defineHandler(async (event) => {
 
       const threads = getFfmpegThreads();
       const tuneFlag = isVideoBg ? "" : "-tune stillimage";
-      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" ${bgInput} -i "${audioPath}" -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k ${tuneFlag} -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+      const pergaminoInput = finalPergaminoPath ? `-loop 1 -framerate 1 -i "${finalPergaminoPath}"` : "";
+      ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 1 -i "${finalImagePath}" ${bgInput} -i "${audioPath}" ${pergaminoInput} -filter_complex "${filter}" -map "[${lastV}]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k ${tuneFlag} -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
 
     } else {
       // Comportamiento fallback
@@ -372,6 +445,9 @@ export default defineHandler(async (event) => {
     }
     if (tempDedPath && fs.existsSync(tempDedPath)) {
       fs.unlinkSync(tempDedPath);
+    }
+    if (tempPergaminoPath && fs.existsSync(tempPergaminoPath)) {
+      fs.unlinkSync(tempPergaminoPath);
     }
   }
 });

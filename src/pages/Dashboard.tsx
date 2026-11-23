@@ -25,7 +25,8 @@ import {
   Download,
   X,
   Activity,
-  Loader2
+  Loader2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -75,9 +76,10 @@ export interface TemplateConfig {
   name: string;
   bgUrl: string;
   type?: 'completa' | 'coordenadas';
-  photo: { x: number; y: number; w: number; h: number; frame?: boolean };
+  photo: { x: number; y: number; w: number; h: number; frame?: boolean; angle?: number };
+  pergamino?: { url?: string; x: number; y: number; w: number; h: number; angle?: number; visible?: boolean };
   titulo: TemplateTextNode;
-  artista: TemplateTextNode; // Usado para Firma
+  artista: TemplateTextNode; // Usado para Frase (anteriormente Firma)
   dedicatoria: TemplateTextNode;
   visualizer?: {
     enabled?: boolean;
@@ -93,7 +95,8 @@ export const DEFAULT_TEMPLATE: TemplateConfig = {
   id: '',
   name: 'Plantilla por Defecto',
   bgUrl: '',
-  photo: { x: 130, y: 180, w: 820, h: 820, frame: true },
+  photo: { x: 130, y: 180, w: 820, h: 820, frame: true, angle: -3 },
+  pergamino: { url: '', x: 130, y: 1040, w: 820, h: 380, angle: 0, visible: true },
   titulo: { x: 130, y: 1040, fontSize: 44, color: 'white', align: 'left', visible: true },
   artista: { x: 130, y: 1100, fontSize: 32, color: '#B3B3B3', align: 'left', visible: true },
   dedicatoria: { x: 540, y: 1620, fontSize: 30, color: '#E5E5E5', align: 'center', visible: true },
@@ -231,7 +234,7 @@ export default function Dashboard() {
     setTemplateCustomBg('');
     setTemplateUserPhotoUrl('https://placehold.co/400x400/eeeeee/999999?text=Portada');
     setTemplateTitulo('Título Muestra');
-    setTemplateArtista('Firma Muestra');
+    setTemplateArtista('Frase Muestra');
     setTemplateDedicatoria('Dedicatoria de muestra...');
     setTemplateDedicatoriaSize(28);
     setTemplateConfig({ ...DEFAULT_TEMPLATE, id: '' });
@@ -286,8 +289,19 @@ export default function Dashboard() {
           y: Number(config.photo.y),
           w: Number(config.photo.w),
           h: Number(config.photo.h),
-          frame: config.photo.frame !== false
+          frame: config.photo.frame !== false,
+          angle: Number(config.photo.angle ?? -3)
         },
+        photoAngle: Number(config.photo.angle ?? -3),
+        pergamino: config.pergamino ? {
+          url: config.pergamino.url || '',
+          x: Number(config.pergamino.x ?? 130),
+          y: Number(config.pergamino.y ?? 1040),
+          w: Number(config.pergamino.w ?? 820),
+          h: Number(config.pergamino.h ?? 380),
+          angle: Number(config.pergamino.angle ?? 0),
+          visible: config.pergamino.visible !== false
+        } : undefined,
         titulo: {
           ...config.titulo,
           x: Number(config.titulo.x),
@@ -692,7 +706,7 @@ export default function Dashboard() {
     
     const finalBg = backgroundUrl === 'custom' ? customBackground : backgroundUrl;
     if (!whatsappNumber || !userPhotoUrl || !titulo || !artista) {
-      toast.error('Por favor, completa todos los campos requeridos (Número, Portada, Título, Firma).');
+      toast.error('Por favor, completa todos los campos requeridos (Número, Portada, Título, Frase).');
       return;
     }
 
@@ -860,7 +874,14 @@ export default function Dashboard() {
       if (!nextConfig.titulo) nextConfig.titulo = { ...DEFAULT_TEMPLATE.titulo };
       if (!nextConfig.artista) nextConfig.artista = { ...DEFAULT_TEMPLATE.artista };
       if (!nextConfig.dedicatoria) nextConfig.dedicatoria = { ...DEFAULT_TEMPLATE.dedicatoria };
-      if (!nextConfig.photo) nextConfig.photo = { ...DEFAULT_TEMPLATE.photo };
+      if (!nextConfig.photo) {
+        nextConfig.photo = { ...DEFAULT_TEMPLATE.photo };
+      } else if (nextConfig.photo.angle === undefined) {
+        nextConfig.photo.angle = configData.photoAngle ?? -3;
+      }
+      if (!nextConfig.pergamino) {
+        nextConfig.pergamino = configData.pergamino || { ...DEFAULT_TEMPLATE.pergamino };
+      }
 
       if (configData.tituloColor) nextConfig.titulo.color = configData.tituloColor;
       if (configData.tituloAlign) nextConfig.titulo.align = configData.tituloAlign;
@@ -1117,6 +1138,7 @@ export default function Dashboard() {
 
   const renderPhotoControls = (config: TemplateConfig, setConfig: any) => {
     const hasFrame = config.photo.frame !== false;
+    const angle = config.photo.angle ?? -3;
 
     return (
       <div className="space-y-2 mt-2 p-2.5 bg-white/70 border border-neutral-200/80 rounded-xl">
@@ -1137,7 +1159,7 @@ export default function Dashboard() {
             <span>Marco Polaroid</span>
           </label>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-neutral-400 uppercase font-bold">X:</span>
             <input
@@ -1174,7 +1196,158 @@ export default function Dashboard() {
               className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
             />
           </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-neutral-400 uppercase font-bold" title="Inclinación en grados">Ángulo:</span>
+            <input
+              type="number"
+              value={angle}
+              onChange={(e) => setConfig({...config, photo: {...config.photo, angle: Number(e.target.value)}})}
+              className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+            />
+          </div>
         </div>
+      </div>
+    );
+  };
+
+  const renderPergaminoControls = (config: TemplateConfig, setConfig: any) => {
+    const perg = config.pergamino || { url: '', x: 130, y: 1040, w: 820, h: 380, angle: 0, visible: true };
+    const isVisible = perg.visible !== false;
+
+    return (
+      <div className="space-y-2 mt-2 p-2.5 bg-white/70 border border-neutral-200/80 rounded-xl">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase text-neutral-600 tracking-wider">
+            Pergamino / Fondo Dedicatoria (PNG)
+          </span>
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-neutral-700">
+            <input
+              type="checkbox"
+              checked={isVisible}
+              onChange={(e) => setConfig({
+                ...config,
+                pergamino: { ...perg, visible: e.target.checked }
+              })}
+              className="rounded accent-[#8B1F32]"
+            />
+            <span>{isVisible ? 'Visible' : 'Oculto'}</span>
+          </label>
+        </div>
+
+        {/* Upload PNG file & preview */}
+        <div className="flex items-center gap-3 pt-1">
+          {perg.url ? (
+            <div className="relative group shrink-0 w-16 h-12 bg-neutral-100 rounded-lg border border-neutral-200 overflow-hidden flex items-center justify-center p-1">
+              <img src={perg.url} alt="Pergamino" className="max-w-full max-h-full object-contain" />
+              <button
+                type="button"
+                onClick={() => setConfig({
+                  ...config,
+                  pergamino: { ...perg, url: '' }
+                })}
+                className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                title="Quitar pergamino"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="w-16 h-12 bg-neutral-100/70 border border-dashed border-neutral-300 rounded-lg flex items-center justify-center text-neutral-400 shrink-0">
+              <ImageIcon className="w-5 h-5 opacity-40" />
+            </div>
+          )}
+
+          <div className="flex-1 flex flex-col gap-1">
+            <label className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-700 cursor-pointer transition-all w-fit">
+              <Upload className="w-3.5 h-3.5 text-[#8B1F32]" />
+              <span>{perg.url ? 'Cambiar PNG' : 'Subir PNG transparente'}</span>
+              <input
+                type="file"
+                accept="image/png,image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  await uploadCoverImage(file, (url) => {
+                    setConfig({
+                      ...config,
+                      pergamino: { ...perg, url }
+                    });
+                  });
+                }}
+              />
+            </label>
+            <span className="text-[10px] text-neutral-400">
+              PNG sin fondo para pergaminos o marcos de dedicatoria
+            </span>
+          </div>
+        </div>
+
+        {/* Coordenadas idénticas a portada sin marco */}
+        {isVisible && (
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-neutral-100">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">X:</span>
+              <input
+                type="number"
+                value={perg.x}
+                onChange={(e) => setConfig({
+                  ...config,
+                  pergamino: { ...perg, x: Number(e.target.value) }
+                })}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">Y:</span>
+              <input
+                type="number"
+                value={perg.y}
+                onChange={(e) => setConfig({
+                  ...config,
+                  pergamino: { ...perg, y: Number(e.target.value) }
+                })}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">W:</span>
+              <input
+                type="number"
+                value={perg.w}
+                onChange={(e) => setConfig({
+                  ...config,
+                  pergamino: { ...perg, w: Number(e.target.value) }
+                })}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">H:</span>
+              <input
+                type="number"
+                value={perg.h}
+                onChange={(e) => setConfig({
+                  ...config,
+                  pergamino: { ...perg, h: Number(e.target.value) }
+                })}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold" title="Inclinación en grados">Ángulo:</span>
+              <input
+                type="number"
+                value={perg.angle ?? 0}
+                onChange={(e) => setConfig({
+                  ...config,
+                  pergamino: { ...perg, angle: Number(e.target.value) }
+                })}
+                className="w-14 px-1.5 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -1655,8 +1828,10 @@ export default function Dashboard() {
                                   y: Number(parsedConfig.photoY ?? parsedConfig.photo?.y ?? 180),
                                   w: Number(parsedConfig.photoWidth ?? parsedConfig.photo?.w ?? 820),
                                   h: Number(parsedConfig.photoHeight ?? parsedConfig.photo?.h ?? 820),
-                                  frame: pFrame !== false
+                                  frame: pFrame !== false,
+                                  angle: Number(parsedConfig.photoAngle ?? parsedConfig.photo?.angle ?? -3)
                                 },
+                                pergamino: parsedConfig.pergamino || { ...DEFAULT_TEMPLATE.pergamino },
                                 titulo: {
                                   x: tX,
                                   y: Number(tY),
@@ -1971,6 +2146,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {renderPhotoControls(studioTemplateConfig, setStudioTemplateConfig)}
+                    {renderPergaminoControls(studioTemplateConfig, setStudioTemplateConfig)}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1986,12 +2162,12 @@ export default function Dashboard() {
                       {renderConfigControls(studioTemplateConfig, setStudioTemplateConfig, 'titulo')}
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Firma</Label>
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Frase</Label>
                       <Input
                         value={artista}
                         onChange={(e) => setArtista(e.target.value)}
                         disabled={isProcessing}
-                        placeholder="Firma..."
+                        placeholder="Frase..."
                         className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] text-xs h-10"
                       />
                       {renderConfigControls(studioTemplateConfig, setStudioTemplateConfig, 'artista')}
@@ -1999,12 +2175,12 @@ export default function Dashboard() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Dedicatoria Final</Label>
+                    <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Dedicatoria</Label>
                     <Textarea
                       value={dedicatoria}
                       onChange={(e) => setDedicatoria(e.target.value)}
                       disabled={isProcessing}
-                      placeholder="Mensaje corto..."
+                      placeholder="Dedicatoria..."
                       rows={2}
                       className="rounded-xl border-neutral-200 focus:ring-[#8B1F32] text-xs resize-none"
                     />
@@ -2174,6 +2350,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   {renderPhotoControls(regenerateTemplateConfig, setRegenerateTemplateConfig)}
+                  {renderPergaminoControls(regenerateTemplateConfig, setRegenerateTemplateConfig)}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -2187,11 +2364,11 @@ export default function Dashboard() {
                       {renderConfigControls(regenerateTemplateConfig, setRegenerateTemplateConfig, 'titulo')}
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Firma</Label>
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Frase</Label>
                       <Input
                         value={regenerateArtista}
                         onChange={(e) => setRegenerateArtista(e.target.value)}
-                        placeholder="Firma..."
+                        placeholder="Frase..."
                         className="rounded-xl border-neutral-200 text-xs h-10 mb-2"
                       />
                       {renderConfigControls(regenerateTemplateConfig, setRegenerateTemplateConfig, 'artista')}
@@ -2334,6 +2511,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   {renderPhotoControls(templateConfig, setTemplateConfig)}
+                  {renderPergaminoControls(templateConfig, setTemplateConfig)}
 
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
@@ -2341,7 +2519,7 @@ export default function Dashboard() {
                       {renderConfigControls(templateConfig, setTemplateConfig, 'titulo')}
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Firma</Label>
+                      <Label className="text-[10px] font-bold uppercase text-neutral-400 tracking-widest">Frase</Label>
                       {renderConfigControls(templateConfig, setTemplateConfig, 'artista')}
                     </div>
                   </div>
