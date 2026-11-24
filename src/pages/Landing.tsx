@@ -968,6 +968,7 @@ export default function Landing() {
                   titulo={titulo}
                   artista={artista}
                   dedicatoria={dedicatoria}
+                  visualizer={constructedConfig.visualizer}
                   scale={previewScale}
                 />
                 
@@ -1060,6 +1061,7 @@ export default function Landing() {
                 titulo={titulo}
                 artista={artista}
                 dedicatoria={dedicatoria}
+                visualizer={constructedConfig.visualizer}
                 scale={previewScale * 1.1} // Slightly larger for the drawer
               />
               <div className="absolute inset-0 pointer-events-none border-[12px] border-white/5 rounded-[32px]" />

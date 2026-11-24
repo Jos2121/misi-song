@@ -1423,6 +1423,18 @@ export default function Dashboard() {
         {enabled && (
           <div className="flex flex-wrap gap-2 items-center pt-1 border-t border-neutral-100">
             <div className="flex items-center gap-1">
+              <span className="text-[10px] text-neutral-400 uppercase font-bold">X:</span>
+              <input
+                type="number"
+                value={vis.x === 'center' ? Math.round((1080 - (vis.w ?? 820)) / 2) : (vis.x ?? 130)}
+                onChange={(e) => setConfig({
+                  ...config,
+                  visualizer: { ...vis, x: Number(e.target.value) }
+                })}
+                className="w-16 px-2 py-1 bg-neutral-50 border border-neutral-200 rounded text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-[#8B1F32]"
+              />
+            </div>
+            <div className="flex items-center gap-1">
               <span className="text-[10px] text-neutral-400 uppercase font-bold">Y:</span>
               <input
                 type="number"

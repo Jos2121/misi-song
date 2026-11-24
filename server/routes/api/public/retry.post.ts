@@ -2,6 +2,7 @@ import { defineHandler } from "nitro";
 import { readBody, createError, setResponseStatus } from "nitro/h3";
 import { pool } from "../../../utils/db";
 import { runFfmpeg, getFfmpegThreads, fetchWithTimeout } from "../../../utils/ffmpegQueue";
+import { generateVisualizerVideo } from "../../../utils/visualizer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -227,6 +228,7 @@ async function processJob(job: any) {
   let tempDedPath = "";
   let tempComposedPath = "";
   let tempOverlayPath = "";
+  let tempVisPath = "";
 
   try {
     const finalPhotoUrl = userPhotoUrl;
@@ -618,56 +620,45 @@ async function processJob(job: any) {
     const isVisEnabled = vis.enabled !== false;
     const visW = Number(vis.w) || 820;
     const visH = Number(vis.h) || 70;
-    const visX = vis.x === 'center' ? '(1080-w)/2' : (Number(vis.x) || 130);
-    const visY = Number(vis.y) || 1180;
+    const resolvedVisX = vis.x === 'center' ? Math.round((1080 - visW) / 2) : (Number(vis.x) || 130);
+    const resolvedVisY = Number(vis.y) || 1180;
 
     const rawColor = vis.color || '#FFFFFF';
     const cleanVisColor = rawColor.startsWith('#')
       ? rawColor
       : (rawColor.startsWith('0x') ? rawColor.replace('0x', '#') : rawColor);
 
-    let ffmpegCommand = "";
-
-    // Construcción de la animación de barras musicales sólidas, estética y moderna
-    const heights = [
-      25, 45, 65, 35, 75, 90, 50, 75, 100, 85, 45, 65, 80, 95, 70, 50,
-      85, 100, 65, 45, 70, 95, 80, 55, 85, 90, 60, 40, 75, 85, 50, 65,
-      40, 60, 35, 50, 30, 20
-    ];
-    const numBars = heights.length;
-    const barW = Math.max(3, Math.floor(visW / (numBars * 1.6)));
-    const totalBarsW = numBars * barW;
-    const gap = (visW - totalBarsW) / (numBars - 1);
-
-    const drawBoxes: string[] = [];
-    for (let i = 0; i < numBars; i++) {
-      const dur = (0.5 + ((i % 5) * 0.14)).toFixed(2);
-      const delay = (((i * 0.05) % 0.6)).toFixed(2);
-      const maxH = Math.round((heights[i] * visH) / 100);
-      const x = Math.round(i * (barW + gap));
-      const factorExpr = `(0.25+0.75*(0.5+0.5*sin(2*PI*(t+${delay})/${dur})))`;
-      const hExpr = `max(6\\,${maxH}*${factorExpr})`;
-      const yExpr = `(${visH / 2}-${hExpr}/2)`;
-      drawBoxes.push(`drawbox=x=${x}:y='${yExpr}':w=${barW}:h='${hExpr}':color=${cleanVisColor}:t=fill`);
+    if (isVisEnabled) {
+      tempVisPath = path.join(mediaDir, `temp_vis_${Date.now()}.mov`);
+      await generateVisualizerVideo(tempVisPath, {
+        w: visW,
+        h: visH,
+        color: cleanVisColor,
+        durationSeconds: 4,
+        fps: 25
+      });
     }
 
+    let ffmpegCommand = "";
+
     if (!isVideoBg) {
+      // Caso 1: Fondo es imagen estática (o color)
+      // Animación de barras musicales idéntica a VideoEditorPreview (cápsulas redondeadas y brillo)
       if (isVisEnabled) {
-        const waveFilter = `color=c=black@0.0:s=${visW}x${visH},format=rgba,${drawBoxes.join(",")}[wave];[0:v][wave]overlay=x=${visX}:y=${visY}:shortest=1[v_out]`;
-        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${waveFilter}" -map "[v_out]" -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+        const waveFilter = `[0:v][1:v]overlay=x=${resolvedVisX}:y=${resolvedVisY}:shortest=1[v_out]`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -stream_loop -1 -i "${tempVisPath}" -i "${audioPath}" -filter_complex "${waveFilter}" -map "[v_out]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       } else {
         ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       }
     } else {
-      let videoFilter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg];[bg][1:v]overlay=shortest=1[v_comp]`;
-      let finalV = 'v_comp';
-
+      // Caso 2: Fondo es Video MP4 (Live Wallpaper)
       if (isVisEnabled) {
-        videoFilter += `;color=c=black@0.0:s=${visW}x${visH},format=rgba,${drawBoxes.join(",")}[wave];[v_comp][wave]overlay=x=${visX}:y=${visY}[v_out]`;
-        finalV = 'v_out';
+        const videoFilter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg];[bg][1:v]overlay=shortest=1[v_comp];[v_comp][2:v]overlay=x=${resolvedVisX}:y=${resolvedVisY}[v_out]`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -stream_loop -1 -i "${tempVisPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[v_out]" -map 3:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+      } else {
+        const videoFilter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg];[bg][1:v]overlay=shortest=1[v_out]`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[v_out]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       }
-
-      ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[${finalV}]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
     }
 
     await runFfmpeg(ffmpegCommand);
@@ -675,8 +666,8 @@ async function processJob(job: any) {
     const relativeVideoUrl = `/media/${videoFileName}`;
     
     await pool.query(
-      `UPDATE "MediaJob" SET "videoUrl" = $1, status = 'completed', "updatedAt" = NOW() WHERE id = $2`,
-      [relativeVideoUrl, jobId]
+      `UPDATE "MediaJob" SET "videoUrl" = $1, "config" = COALESCE($2, "config"), status = 'completed', "updatedAt" = NOW() WHERE id = $3`,
+      [relativeVideoUrl, t ? JSON.stringify(t) : null, jobId]
     );
   } finally {
     const toClean = [
@@ -685,7 +676,8 @@ async function processJob(job: any) {
       tempArtistPath,
       tempDedPath,
       tempComposedPath,
-      tempOverlayPath
+      tempOverlayPath,
+      tempVisPath
     ];
 
     if (tempBgPath && tempBgPath.includes('temp_bg_')) {
