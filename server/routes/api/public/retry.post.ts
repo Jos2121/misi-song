@@ -646,18 +646,18 @@ async function processJob(job: any) {
       // Animación de barras musicales idéntica a VideoEditorPreview (cápsulas redondeadas y brillo)
       if (isVisEnabled) {
         const waveFilter = `[0:v][1:v]overlay=x=${resolvedVisX}:y=${resolvedVisY}:shortest=1[v_out]`;
-        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -stream_loop -1 -i "${tempVisPath}" -i "${audioPath}" -filter_complex "${waveFilter}" -map "[v_out]" -map 2:a -c:v libx264 -preset ultrafast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -stream_loop -1 -i "${tempVisPath}" -i "${audioPath}" -filter_complex "${waveFilter}" -map "[v_out]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       } else {
-        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v libx264 -preset ultrafast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -tune stillimage -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       }
     } else {
       // Caso 2: Fondo es Video MP4 (Live Wallpaper)
       if (isVisEnabled) {
         const videoFilter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg];[bg][1:v]overlay=shortest=1[v_comp];[v_comp][2:v]overlay=x=${resolvedVisX}:y=${resolvedVisY}[v_out]`;
-        ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -stream_loop -1 -i "${tempVisPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[v_out]" -map 3:a -c:v libx264 -preset ultrafast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -stream_loop -1 -i "${tempVisPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[v_out]" -map 3:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       } else {
         const videoFilter = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2,fps=25[bg];[bg][1:v]overlay=shortest=1[v_out]`;
-        ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[v_out]" -map 2:a -c:v libx264 -preset ultrafast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
+        ffmpegCommand = `ffmpeg -y -threads ${threads} -stream_loop -1 -i "${tempBgPath}" -loop 1 -framerate 25 -i "${staticOutPath}" -i "${audioPath}" -filter_complex "${videoFilter}" -map "[v_out]" -map 2:a -c:v libx264 -preset veryfast -crf 26 -maxrate 2800k -bufsize 5600k -c:a aac -b:a 160k -pix_fmt yuv420p -movflags +faststart -shortest "${videoPath}"`;
       }
     }
 
