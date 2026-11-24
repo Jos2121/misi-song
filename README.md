@@ -43,7 +43,7 @@ Variables de entorno en `.env` (ver `.env.example`).
    | `NODE_OPTIONS` | No | Ya definido en el `Dockerfile` (`--max-old-space-size=512`) |
    | `FFMPEG_CONCURRENCY` | No | Renders simultáneos, default `1` |
    | `FFMPEG_THREADS` | No | Hilos por render, default `2` |
-   | `FFMPEG_TIMEOUT_MS` | No | Timeout por render, default `180000` |
+   | `FFMPEG_TIMEOUT_MS` | No | Timeout por render, default `360000` |
    | `PG_POOL_MAX` | No | Conexiones del pool, default `10` |
 
 5. **Volumen persistente:** monta un volumen en `/usr/src/app/public/media`

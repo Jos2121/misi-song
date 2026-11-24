@@ -1,7 +1,7 @@
 import { exec } from "child_process";
 
 const MAX_CONCURRENT = Math.max(1, Number(process.env.FFMPEG_CONCURRENCY || 1));
-const DEFAULT_TIMEOUT_MS = Math.max(30000, Number(process.env.FFMPEG_TIMEOUT_MS || 180000));
+const DEFAULT_TIMEOUT_MS = Math.max(30000, Number(process.env.FFMPEG_TIMEOUT_MS || 360000));
 
 let activeCount = 0;
 const waitQueue: Array<() => void> = [];
