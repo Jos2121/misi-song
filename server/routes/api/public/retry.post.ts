@@ -529,7 +529,7 @@ async function processJob(job: any) {
       const boxH = Math.max(lineHeightPx, lineCount * lineHeightPx);
 
       if (!opts.angle || opts.angle === 0) {
-        staticFilter += `;[${lastV}]drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${pos}:y=${opts.y}:text_align=${alignFlag}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
+        staticFilter += `;[${lastV}]drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${pos}:y=${opts.y}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[v${vIndex}]`;
         lastV = `v${vIndex}`;
         vIndex++;
         return;
@@ -552,7 +552,7 @@ async function processJob(job: any) {
         overlayPos = `x='${1080 - 86} - ${offsetX} - w/2':y='${Math.round(opts.y + boxH / 2)} - ${offsetY} - h/2'`;
       }
 
-      staticFilter += `;color=c=black@0.0:s=${boxW}x${boxH},format=rgba,drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${inBoxX}:y=0:text_align=${alignFlag}:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[box_${opts.key}];[box_${opts.key}]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[rot_${opts.key}];[${lastV}][rot_${opts.key}]overlay=${overlayPos}[v${vIndex}]`;
+      staticFilter += `;color=c=black@0.0:s=${boxW}x${boxH},format=rgba,drawtext=textfile='${escapedPath}'${fontParam}:fontcolor=${opts.color}:fontsize=${opts.fontSize}:x=${inBoxX}:y=0:line_spacing=${lineSpacing}:shadowcolor=0x000000@0.55:shadowx=2:shadowy=2[box_${opts.key}];[box_${opts.key}]rotate=${rad}:ow='rotw(${rad})':oh='roth(${rad})':c=none[rot_${opts.key}];[${lastV}][rot_${opts.key}]overlay=${overlayPos}[v${vIndex}]`;
       lastV = `v${vIndex}`;
       vIndex++;
     };
